@@ -129,6 +129,8 @@ env.bak/
 venv.bak/
 .claude/
 .gemini/
+.gcloud/
+
 
 # Spyder project settings
 .spyderproject
