@@ -130,6 +130,9 @@ venv.bak/
 .claude/
 .gemini/
 .gcloud/
+# Allow checked-in deployment env files
+!deployment/env/
+!deployment/env/backend.env
 
 
 # Spyder project settings
