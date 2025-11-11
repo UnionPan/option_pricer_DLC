@@ -1,0 +1,68 @@
+.option-chain-table {
+  padding: 1rem;
+}
+
+.spot-price {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+}
+
+.chain-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.calls-section h3 {
+  color: #28a745;
+}
+
+.puts-section h3 {
+  color: #dc3545;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th {
+  background-color: #f8f9fa;
+  padding: 0.5rem;
+  text-align: right;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+}
+
+th:first-child {
+  text-align: left;
+}
+
+td {
+  padding: 0.4rem 0.5rem;
+  text-align: right;
+  border-bottom: 1px solid #dee2e6;
+}
+
+td:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+tr.in-the-money {
+  background-color: #fffbea;
+}
+
+tr:hover {
+  background-color: #f8f9fa;
+}
+
+@media (max-width: 768px) {
+  .chain-container {
+    grid-template-columns: 1fr;
+  }
+}

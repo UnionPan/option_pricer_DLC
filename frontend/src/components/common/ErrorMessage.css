@@ -1,0 +1,16 @@
+.error-message {
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 4px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.error-message h3 {
+  color: #c00;
+  margin-top: 0;
+}
+
+.error-message p {
+  color: #600;
+}

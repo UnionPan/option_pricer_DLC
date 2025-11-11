@@ -1,0 +1,53 @@
+.option-chain-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.option-chain-page h1 {
+  color: #333;
+  margin-bottom: 2rem;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  align-items: center;
+}
+
+.symbol-input {
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  width: 200px;
+}
+
+.symbol-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.fetch-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  background-color: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.fetch-button:hover {
+  background-color: #5568d3;
+}
+
+.chain-info {
+  margin-bottom: 1rem;
+}
+
+.chain-info h2 {
+  color: #667eea;
+}

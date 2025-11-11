@@ -1,0 +1,73 @@
+# Data source configuration for underlying prices and option chains
+
+# Underlying asset data
+underlying:
+  # Primary data source (yfinance, pandas_datareader, csv, etc.)
+  source: yfinance
+
+  # Update frequency
+  frequency: 1d  # 1d, 1h, 1m
+
+  # Symbols to track
+  symbols:
+    - AAPL
+    - SPY
+    - QQQ
+
+  # Historical data range
+  history:
+    days: 365  # Number of days to fetch
+
+  # Rate limiting
+  rate_limit:
+    requests_per_second: 2
+
+# Option chain data
+options:
+  # Primary source for option chain data
+  source: yfinance  # yfinance, WRDS, Interactive Brokers, etc.
+
+  # Filters
+  filters:
+    min_volume: 10  # Minimum volume for inclusion
+    min_open_interest: 50  # Minimum open interest
+    max_bid_ask_spread: 0.5  # Maximum bid-ask spread as fraction of mid
+    moneyness_range:
+      lower: 0.8  # 80% of spot
+      upper: 1.2  # 120% of spot
+
+  # Cache settings
+  cache:
+    enabled: true
+    ttl_minutes: 60  # Time to live for cached data
+    directory: data/raw
+
+# Risk-free rate
+risk_free_rate:
+  # Source for risk-free rate (treasury, fixed, fred)
+  source: fixed
+  value: 0.05  # 5% annual rate (used if source is 'fixed')
+
+  # If using treasury data
+  treasury:
+    maturity: 3m  # 3m, 6m, 1y, 2y, 5y, 10y, 30y
+
+# Dividend yield
+dividend:
+  # Source (api, fixed, calculated)
+  source: api
+  fallback_value: 0.0  # Used if API fails
+
+# Data validation
+validation:
+  # Remove options with prices outside these bounds
+  price_bounds:
+    min: 0.01  # Minimum option price
+    max: 1000.0  # Maximum option price
+
+  # Remove options with these issues
+  filters:
+    - zero_bid
+    - zero_ask
+    - negative_time_value
+    - violates_arbitrage_bounds

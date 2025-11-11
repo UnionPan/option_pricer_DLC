@@ -1,0 +1,38 @@
+# Core scientific computing
+numpy>=1.24.0
+scipy>=1.10.0
+pandas>=2.0.0
+
+# Options pricing and quantitative finance
+py_vollib>=1.0.1  # Implied volatility calculations
+# QuantLib-Python>=1.31  # Optional: Commented out for Docker compatibility
+
+# Data fetching
+yfinance>=0.2.28  # Yahoo Finance data
+pandas-datareader>=0.10.0
+
+# Visualization (not needed for backend API)
+# matplotlib>=3.7.0
+# seaborn>=0.12.0
+# plotly>=5.14.0
+
+# Configuration
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Jupyter and notebook support (not needed for deployment)
+# jupyter>=1.0.0
+# ipywidgets>=8.0.0
+
+# Testing (not needed for deployment)
+# pytest>=7.4.0
+# pytest-cov>=4.1.0
+
+# Code quality (not needed for deployment)
+# black>=23.0.0
+# flake8>=6.0.0
+# mypy>=1.4.0
+
+# Utilities
+tqdm>=4.65.0
+python-dateutil>=2.8.2

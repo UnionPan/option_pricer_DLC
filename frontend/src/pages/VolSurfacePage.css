@@ -1,0 +1,72 @@
+.vol-surface-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.vol-surface-page h1 {
+  color: #333;
+  margin-bottom: 2rem;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.control-group label {
+  font-weight: 500;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.input-field {
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  width: 150px;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.build-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  background-color: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  height: fit-content;
+}
+
+.build-button:hover {
+  background-color: #5568d3;
+}
+
+.surface-info {
+  margin-bottom: 1rem;
+}
+
+.surface-info h2 {
+  color: #667eea;
+  margin-bottom: 0.5rem;
+}
+
+.surface-info p {
+  color: #666;
+}

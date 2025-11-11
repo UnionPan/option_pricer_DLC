@@ -1,0 +1,35 @@
+version: '3.3'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deployment/docker/backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - BACKEND_CORS_ORIGINS=http://localhost:3000,http://localhost:80
+      - DEFAULT_RISK_FREE_RATE=0.05
+    volumes:
+      - ./data:/app/data
+    networks:
+      - options-desk-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deployment/docker/frontend/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api/v1
+    networks:
+      - options-desk-network
+    restart: unless-stopped
+
+networks:
+  options-desk-network:
+    driver: bridge

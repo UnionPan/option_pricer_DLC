@@ -1,0 +1,123 @@
+# Hedging and risk management configuration
+
+# Portfolio risk limits
+risk_limits:
+  # Greek limits (absolute values)
+  delta:
+    max: 1000  # Maximum net delta exposure
+    warning: 800  # Warning threshold
+
+  gamma:
+    max: 500  # Maximum gamma exposure
+    warning: 400
+
+  vega:
+    max: 2000  # Maximum vega exposure (per 1% vol change)
+    warning: 1600
+
+  theta:
+    max: 500  # Maximum theta decay per day
+    warning: 400
+
+  # Position limits
+  position:
+    max_notional: 1000000  # Maximum notional exposure
+    max_options_per_contract: 100  # Maximum contracts per option
+
+# Delta hedging strategy
+delta_hedging:
+  # Rebalancing rules
+  rebalance:
+    # Trigger rebalancing when delta exceeds threshold
+    delta_threshold: 50  # Rebalance if |delta| > 50
+
+    # Time-based rebalancing
+    time_based:
+      enabled: true
+      frequency: 1d  # 1h, 4h, 1d
+
+    # Min time between rebalances
+    min_interval_minutes: 30
+
+  # Hedging instrument
+  hedge_with: underlying  # underlying, futures, other_options
+
+  # Transaction costs
+  transaction_costs:
+    underlying:
+      fixed: 0.0  # Fixed cost per trade
+      proportional: 0.0005  # 0.05% of trade value
+
+    options:
+      fixed: 0.65  # Per contract
+      proportional: 0.0
+
+# Gamma hedging
+gamma_hedging:
+  enabled: false  # Enable delta-gamma hedging
+
+  # Gamma target
+  target_gamma: 0  # Target gamma after hedging
+  tolerance: 50  # Acceptable gamma range
+
+  # Hedging instruments
+  instruments:
+    - ATM_call
+    - ATM_put
+
+# Vega hedging
+vega_hedging:
+  enabled: false  # Enable vega hedging
+
+  # Vega target
+  target_vega: 0  # Target vega exposure
+  tolerance: 100
+
+  # Hedging instruments (typically options at different maturities)
+  instruments:
+    - options_30d
+    - options_60d
+
+# P&L attribution
+pnl_attribution:
+  # Components to track
+  components:
+    - delta_pnl
+    - gamma_pnl
+    - vega_pnl
+    - theta_pnl
+    - higher_order
+    - unexplained
+
+  # Calculation frequency
+  frequency: 1d
+
+# Performance metrics
+metrics:
+  # Metrics to calculate
+  track:
+    - sharpe_ratio
+    - sortino_ratio
+    - max_drawdown
+    - win_rate
+    - profit_factor
+    - total_return
+    - hedging_error
+
+  # Benchmark
+  benchmark: SPY
+
+# Backtesting settings
+backtest:
+  # Initial capital
+  initial_capital: 100000
+
+  # Slippage model
+  slippage:
+    type: proportional  # fixed, proportional, or custom
+    value: 0.0001  # 0.01%
+
+  # Market impact
+  market_impact:
+    enabled: false
+    model: linear  # linear, sqrt, or custom
