@@ -45,7 +45,7 @@ steps:
       - '300'
       - '--port'
       - '8080'
-      - '--set-env-vars=DEFAULT_RISK_FREE_RATE=0.05,BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:8000","http://localhost:8080","https://options-desk-frontend-m2ogfaokjq-ue.a.run.app"]'
+      - '--env-vars-file=deployment/env/backend.env'
 
 images:
   - 'gcr.io/$PROJECT_ID/options-desk-backend:$COMMIT_SHA'
