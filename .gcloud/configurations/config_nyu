@@ -1,0 +1,8 @@
+[core]
+account = yp1170@nyu.edu
+project = vertex-ai-qz494-larx-785c
+
+[compute]
+region = us-east1
+zone = us-east1-b
+
