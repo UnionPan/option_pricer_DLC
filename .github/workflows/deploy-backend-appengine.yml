@@ -1,0 +1,44 @@
+name: Deploy Backend to App Engine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'src/**'
+      - 'deployment/docker/backend/**'
+      - 'deployment/cloudbuild/backend-appengine.yaml'
+      - 'deployment/appengine/backend.yaml'
+
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  SERVICE_NAME: backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Submit build to Cloud Build
+        run: |
+          gcloud builds submit \
+            --config=deployment/cloudbuild/backend-appengine.yaml \
+            --substitutions=COMMIT_SHA=${{ github.sha }} \
+            .
