@@ -20,8 +20,7 @@ automatic_scaling:
 
 # Network
 network:
-  forwarded_ports:
-    - 8080
+  name: appengine-flex
 
 # Health check
 liveness_check:

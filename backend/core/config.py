@@ -18,6 +18,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",  # React dev server
         "http://localhost:8000",  # Backend dev server
         "http://localhost:8080",  # Alternative frontend port
+        "https://vertex-ai-qz494-larx-785c.ue.r.appspot.com",  # App Engine frontend
+        "https://backend-dot-vertex-ai-qz494-larx-785c.ue.r.appspot.com",  # App Engine backend
     ]
 
     # Data Configuration

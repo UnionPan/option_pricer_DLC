@@ -31,6 +31,7 @@ EXPOSE 8080
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
+ENV PORT=8080
 
-# Run the application (use PORT env var from Cloud Run)
-CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8080}
+# Run the application
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"]

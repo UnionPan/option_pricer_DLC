@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PROJECT_ID: ${{ secrets.GCP_SA_PROJECT_ID_LARX }}
   SERVICE_NAME: backend
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY_LARX }}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
@@ -39,6 +39,7 @@ jobs:
       - name: Submit build to Cloud Build
         run: |
           gcloud builds submit \
+            --project=$PROJECT_ID \
             --config=deployment/cloudbuild/backend-appengine.yaml \
             --substitutions=COMMIT_SHA=${{ github.sha }} \
             .

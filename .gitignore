@@ -130,6 +130,8 @@ venv.bak/
 .claude/
 .gemini/
 .gcloud/
+# GCP service account keys
+*sa-key.json
 # Allow checked-in deployment env files
 !deployment/env/
 !deployment/env/backend.env
