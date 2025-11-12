@@ -23,6 +23,12 @@ const menuItems: MenuItem[] = [
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('market');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handlePageChange = (page: Page) => {
+    setCurrentPage(page);
+    setMobileMenuOpen(false); // Close mobile menu when page changes
+  };
 
   const renderPage = () => {
     switch (currentPage) {
@@ -47,8 +53,18 @@ function App() {
 
   return (
     <div className="App">
+      {/* Mobile Menu Button */}
+      <button className="mobile-menu-button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+        <div className="hamburger">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </button>
+
+      {/* Sidebar - Desktop */}
       <aside className="sidebar">
-        <div className="sidebar-header" onClick={() => setCurrentPage('market')} style={{ cursor: 'pointer' }}>
+        <div className="sidebar-header" onClick={() => handlePageChange('market')} style={{ cursor: 'pointer' }}>
           <h1 className="sidebar-title">AIS opt</h1>
         </div>
         <nav className="sidebar-nav">
@@ -56,13 +72,38 @@ function App() {
             <button
               key={item.id}
               className={`sidebar-nav-item ${currentPage === item.id ? 'active' : ''}`}
-              onClick={() => setCurrentPage(item.id)}
+              onClick={() => handlePageChange(item.id)}
             >
               {item.label}
             </button>
           ))}
         </nav>
       </aside>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <>
+          <div className="mobile-menu-overlay" onClick={() => setMobileMenuOpen(false)}></div>
+          <div className="mobile-menu">
+            <div className="mobile-menu-header">
+              <h1 className="sidebar-title" onClick={() => handlePageChange('market')}>AIS opt</h1>
+              <button className="close-button" onClick={() => setMobileMenuOpen(false)}>×</button>
+            </div>
+            <nav className="mobile-nav">
+              {menuItems.map((item) => (
+                <button
+                  key={item.id}
+                  className={`mobile-nav-item ${currentPage === item.id ? 'active' : ''}`}
+                  onClick={() => handlePageChange(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </>
+      )}
+
       <main className="main-content">{renderPage()}</main>
     </div>
   );
