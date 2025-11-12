@@ -2,7 +2,7 @@ name: Deploy Frontend to App Engine
 
 on:
   push:
-    branches: [feature/larx]
+    branches: [main, feature/larx]
     paths:
       - 'frontend/**'
       - 'deployment/docker/frontend/**'

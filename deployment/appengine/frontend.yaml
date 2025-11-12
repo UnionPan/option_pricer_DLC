@@ -7,7 +7,7 @@ service: default
 # Resources (frontend needs less)
 resources:
   cpu: 1
-  memory_gb: 0.5
+  memory_gb: 1
   disk_size_gb: 10
 
 # Automatic scaling
