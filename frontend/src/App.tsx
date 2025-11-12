@@ -4,19 +4,42 @@ import HomePage from './pages/HomePage';
 import OptionChainPage from './pages/OptionChainPage';
 import VolSurfacePage from './pages/VolSurfacePage';
 
-type Page = 'home' | 'chain' | 'surface';
+type Page = 'market' | 'chain' | 'implied-vol' | 'greeks' | 'hedging' | 'approx-is-hedging' | 'portfolio-risk';
+
+interface MenuItem {
+  id: Page;
+  label: string;
+}
+
+const menuItems: MenuItem[] = [
+  { id: 'market', label: 'Market' },
+  { id: 'chain', label: 'Chain & Price' },
+  { id: 'implied-vol', label: 'Implied Vol' },
+  { id: 'greeks', label: 'Greeks' },
+  { id: 'hedging', label: 'Hedging' },
+  { id: 'approx-is-hedging', label: 'Approx IS Hedging' },
+  { id: 'portfolio-risk', label: 'Portfolio Risk' },
+];
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('home');
+  const [currentPage, setCurrentPage] = useState<Page>('market');
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'home':
+      case 'market':
         return <HomePage />;
       case 'chain':
         return <OptionChainPage />;
-      case 'surface':
+      case 'implied-vol':
         return <VolSurfacePage />;
+      case 'greeks':
+        return <div className="page-placeholder">Greeks Page - Coming Soon</div>;
+      case 'hedging':
+        return <div className="page-placeholder">Hedging Page - Coming Soon</div>;
+      case 'approx-is-hedging':
+        return <div className="page-placeholder">Approx IS Hedging Page - Coming Soon</div>;
+      case 'portfolio-risk':
+        return <div className="page-placeholder">Portfolio Risk Page - Coming Soon</div>;
       default:
         return <HomePage />;
     }
@@ -24,29 +47,22 @@ function App() {
 
   return (
     <div className="App">
-      <nav className="navbar">
-        <div className="nav-brand">Options Desk</div>
-        <div className="nav-links">
-          <button
-            className={currentPage === 'home' ? 'active' : ''}
-            onClick={() => setCurrentPage('home')}
-          >
-            Home
-          </button>
-          <button
-            className={currentPage === 'chain' ? 'active' : ''}
-            onClick={() => setCurrentPage('chain')}
-          >
-            Option Chain
-          </button>
-          <button
-            className={currentPage === 'surface' ? 'active' : ''}
-            onClick={() => setCurrentPage('surface')}
-          >
-            Vol Surface
-          </button>
+      <aside className="sidebar">
+        <div className="sidebar-header" onClick={() => setCurrentPage('market')} style={{ cursor: 'pointer' }}>
+          <h1 className="sidebar-title">AIS opt</h1>
         </div>
-      </nav>
+        <nav className="sidebar-nav">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              className={`sidebar-nav-item ${currentPage === item.id ? 'active' : ''}`}
+              onClick={() => setCurrentPage(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
       <main className="main-content">{renderPage()}</main>
     </div>
   );

@@ -1,0 +1,23 @@
+.ohlc-chart-card {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px var(--card-shadow);
+  margin-top: 2rem;
+}
+
+.chart-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.ohlc-chart-wrapper {
+  background: var(--bg-primary);
+  border-radius: 6px;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  min-height: 400px;
+  width: 100%;
+}

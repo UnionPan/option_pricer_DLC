@@ -1,36 +1,88 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { marketApi } from '../services/marketApi';
+import { MarketOverviewResponse, IndexChartsResponse } from '../types/market';
+import MarketIndices from '../components/market/MarketIndices';
+import IndexCharts from '../components/market/IndexCharts';
+import Magnificent7 from '../components/market/Magnificent7';
+import CommodityFutures from '../components/market/CommodityFutures';
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import ErrorMessage from '../components/common/ErrorMessage';
 import './HomePage.css';
 
 const HomePage: React.FC = () => {
+  const [marketData, setMarketData] = useState<MarketOverviewResponse | null>(null);
+  const [chartData, setChartData] = useState<IndexChartsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMarketData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [overview, charts] = await Promise.all([
+          marketApi.getMarketOverview(),
+          marketApi.getIndexCharts(),
+        ]);
+
+        setMarketData(overview);
+        setChartData(charts);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch market data');
+        console.error('Error fetching market data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMarketData();
+
+    // Refresh data every 1 hour
+    const interval = setInterval(fetchMarketData, 3600000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="home-page">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="home-page">
+        <ErrorMessage message={error} />
+      </div>
+    );
+  }
+
   return (
     <div className="home-page">
-      <header className="hero">
-        <h1>Options Desk</h1>
-        <p className="subtitle">
-          A comprehensive options pricing, risk management, and hedging framework
-        </p>
-      </header>
+      <div className="market-header">
+        <h1>Market Overview</h1>
+      </div>
 
-      <div className="features">
-        <div className="feature-card">
-          <h2>Option Chains</h2>
-          <p>Fetch and analyze real-time option chain data with strikes, prices, and Greeks.</p>
+      {/* Top Section: Indices (Left) + Charts (Right) */}
+      <div className="market-top-section">
+        <div className="market-top-left">
+          {marketData && <MarketIndices indices={marketData.indices} />}
         </div>
-
-        <div className="feature-card">
-          <h2>Pricing Calculator</h2>
-          <p>Calculate option prices and Greeks using Black-Scholes model.</p>
-        </div>
-
-        <div className="feature-card">
-          <h2>Volatility Surface</h2>
-          <p>Visualize implied volatility surfaces in 3D across strikes and maturities.</p>
+        <div className="market-top-right">
+          {chartData && <IndexCharts charts={chartData.charts} />}
         </div>
       </div>
 
-      <div className="getting-started">
-        <h2>Getting Started</h2>
-        <p>Select a feature from the navigation above to begin exploring options analytics.</p>
+      {/* Middle Section: Magnificent 7 */}
+      <div className="market-middle-section">
+        {marketData && <Magnificent7 stocks={marketData.magnificent7} />}
+      </div>
+
+      {/* Bottom Section: Commodity Futures */}
+      <div className="market-bottom-section">
+        {marketData && <CommodityFutures commodities={marketData.commodities} />}
       </div>
     </div>
   );

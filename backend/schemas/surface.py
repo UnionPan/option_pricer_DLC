@@ -19,6 +19,8 @@ class VolSurfaceRequest(BaseModel):
     spot_price: Optional[float] = Field(None, description="Current spot price. If None, fetches live.")
     min_expiry_days: int = Field(default=7, description="Minimum days to expiration")
     max_expiry_days: int = Field(default=365, description="Maximum days to expiration")
+    interpolate: bool = Field(default=False, description="Whether to interpolate the surface")
+    grid_size: int = Field(default=30, description="Grid size for interpolation")
 
 
 class VolSurfaceResponse(BaseModel):

@@ -1,8 +1,10 @@
 """Volatility surface building service."""
 import yfinance as yf
 import pandas as pd
+import numpy as np
 from typing import List
 from datetime import datetime
+from scipy.interpolate import griddata, Rbf
 from backend.schemas.surface import (
     VolSurfaceRequest,
     VolSurfaceResponse,
@@ -96,6 +98,12 @@ class SurfaceService:
         if not surface_points:
             raise ValueError(f"No valid surface points found for {request.symbol}")
 
+        # Apply interpolation if requested
+        if request.interpolate:
+            surface_points = SurfaceService._interpolate_surface(
+                surface_points, spot_price, request.grid_size
+            )
+
         # Count unique expirations and strikes
         unique_expiries = len(set(p.expiry for p in surface_points))
         unique_strikes = len(set(p.strike for p in surface_points))
@@ -107,6 +115,120 @@ class SurfaceService:
             num_expirations=unique_expiries,
             num_strikes=unique_strikes,
         )
+
+    @staticmethod
+    def _interpolate_surface(
+        raw_points: List[VolSurfacePoint], spot_price: float, grid_size: int = 30
+    ) -> List[VolSurfacePoint]:
+        """Interpolate volatility surface using RBF interpolation."""
+        if len(raw_points) < 4:
+            # Not enough points for interpolation
+            return raw_points
+
+        # Extract data from raw points
+        moneyness = np.array([p.moneyness for p in raw_points])
+        expiry = np.array([p.expiry for p in raw_points])
+        iv = np.array([p.implied_vol for p in raw_points])
+
+        # Create grid for interpolation
+        moneyness_min, moneyness_max = moneyness.min(), moneyness.max()
+        expiry_min, expiry_max = expiry.min(), expiry.max()
+
+        # Add some margin for extrapolation
+        moneyness_margin = (moneyness_max - moneyness_min) * 0.1
+        expiry_margin = (expiry_max - expiry_min) * 0.1
+
+        moneyness_grid = np.linspace(
+            max(0.5, moneyness_min - moneyness_margin),
+            min(2.0, moneyness_max + moneyness_margin),
+            grid_size
+        )
+        expiry_grid = np.linspace(
+            max(0.01, expiry_min - expiry_margin),
+            expiry_max + expiry_margin,
+            grid_size
+        )
+
+        # Create meshgrid
+        M, E = np.meshgrid(moneyness_grid, expiry_grid)
+
+        # Interpolate using griddata with cubic method
+        try:
+            IV_grid = griddata(
+                (moneyness, expiry),
+                iv,
+                (M, E),
+                method='cubic',
+                fill_value=np.nan
+            )
+
+            # Fill NaN values with linear interpolation
+            nan_mask = np.isnan(IV_grid)
+            if nan_mask.any():
+                IV_linear = griddata(
+                    (moneyness, expiry),
+                    iv,
+                    (M, E),
+                    method='linear',
+                    fill_value=np.nan
+                )
+                IV_grid[nan_mask] = IV_linear[nan_mask]
+
+            # Fill remaining NaN values with nearest neighbor
+            nan_mask = np.isnan(IV_grid)
+            if nan_mask.any():
+                IV_nearest = griddata(
+                    (moneyness, expiry),
+                    iv,
+                    (M, E),
+                    method='nearest'
+                )
+                IV_grid[nan_mask] = IV_nearest[nan_mask]
+
+        except Exception:
+            # Fallback to linear interpolation
+            IV_grid = griddata(
+                (moneyness, expiry),
+                iv,
+                (M, E),
+                method='linear',
+                fill_value=np.nan
+            )
+
+            # Fill NaN with nearest
+            nan_mask = np.isnan(IV_grid)
+            if nan_mask.any():
+                IV_nearest = griddata(
+                    (moneyness, expiry),
+                    iv,
+                    (M, E),
+                    method='nearest'
+                )
+                IV_grid[nan_mask] = IV_nearest[nan_mask]
+
+        # Convert grid back to list of points
+        interpolated_points = []
+        for i in range(grid_size):
+            for j in range(grid_size):
+                m = M[i, j]
+                e = E[i, j]
+                implied_vol = float(IV_grid[i, j])
+
+                # Skip invalid values
+                if np.isnan(implied_vol) or implied_vol <= 0:
+                    continue
+
+                strike = m * spot_price
+                interpolated_points.append(
+                    VolSurfacePoint(
+                        strike=strike,
+                        expiry=e,
+                        implied_vol=implied_vol,
+                        moneyness=m,
+                    )
+                )
+
+        return interpolated_points if interpolated_points else raw_points
 
     @staticmethod
     def get_vol_smile(request: VolSmileRequest) -> VolSmileResponse:

@@ -1,0 +1,78 @@
+.market-indices-card {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px var(--card-shadow);
+  height: 100%;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.indices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.index-item {
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  transition: transform 0.2s;
+}
+
+.index-item:hover {
+  transform: translateX(4px);
+}
+
+.index-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.index-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.index-symbol {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+}
+
+.index-data {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.index-price {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.index-change {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.index-change.positive {
+  color: var(--positive-color);
+}
+
+.index-change.negative {
+  color: var(--negative-color);
+}

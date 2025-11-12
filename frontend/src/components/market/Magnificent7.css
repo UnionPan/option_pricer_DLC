@@ -1,0 +1,64 @@
+.magnificent7-card {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px var(--card-shadow);
+}
+
+.magnificent7-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.stock-item {
+  background: var(--bg-primary);
+  border-radius: 6px;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stock-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--card-shadow);
+}
+
+.stock-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.stock-symbol {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.stock-change {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.stock-change.positive {
+  color: var(--positive-color);
+}
+
+.stock-change.negative {
+  color: var(--negative-color);
+}
+
+.stock-name {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.stock-price {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}

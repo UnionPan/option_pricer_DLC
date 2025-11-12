@@ -14,6 +14,8 @@ export interface VolSurfaceRequest {
   spot_price?: number;
   min_expiry_days?: number;
   max_expiry_days?: number;
+  interpolate?: boolean;
+  grid_size?: number;
 }
 
 export interface VolSurfaceResponse {

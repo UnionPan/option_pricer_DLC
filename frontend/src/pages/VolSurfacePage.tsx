@@ -10,6 +10,7 @@ const VolSurfacePage: React.FC = () => {
   const [symbol, setSymbol] = useState('AAPL');
   const [minDays, setMinDays] = useState(7);
   const [maxDays, setMaxDays] = useState(180);
+  const [interpolate, setInterpolate] = useState(false);
   const [surfaceData, setSurfaceData] = useState<VolSurfaceResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +29,8 @@ const VolSurfacePage: React.FC = () => {
         symbol: symbol.toUpperCase(),
         min_expiry_days: minDays,
         max_expiry_days: maxDays,
+        interpolate: interpolate,
+        grid_size: 30,
       });
       setSurfaceData(data);
     } catch (err: any) {
@@ -73,6 +76,18 @@ const VolSurfacePage: React.FC = () => {
           />
         </div>
 
+        <div className="control-group">
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={interpolate}
+              onChange={(e) => setInterpolate(e.target.checked)}
+              className="toggle-checkbox"
+            />
+            <span className="toggle-text">Interpolate Surface</span>
+          </label>
+        </div>
+
         <button onClick={handleBuildSurface} className="build-button">
           Build Surface
         </button>
@@ -88,7 +103,8 @@ const VolSurfacePage: React.FC = () => {
             <p>
               <strong>Spot Price:</strong> ${surfaceData.spot_price.toFixed(2)} |{' '}
               <strong>Expirations:</strong> {surfaceData.num_expirations} |{' '}
-              <strong>Strikes:</strong> {surfaceData.num_strikes}
+              <strong>Strikes:</strong> {surfaceData.num_strikes} |{' '}
+              <strong>Mode:</strong> {interpolate ? 'Interpolated' : 'Raw Data'}
             </p>
           </div>
           <VolSurface3D surfacePoints={surfaceData.surface_points} symbol={surfaceData.symbol} />

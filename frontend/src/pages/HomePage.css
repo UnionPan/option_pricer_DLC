@@ -1,61 +1,64 @@
 .home-page {
-  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
 }
 
-.hero {
-  text-align: center;
-  padding: 3rem 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 8px;
-  margin-bottom: 3rem;
-}
-
-.hero h1 {
-  font-size: 3rem;
+.market-header {
   margin-bottom: 1rem;
 }
 
-.subtitle {
-  font-size: 1.2rem;
-  opacity: 0.9;
+.market-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
 }
 
-.features {
+/* Top Section: Indices (Left) + Charts (Right) */
+.market-top-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-  margin-bottom: 3rem;
+  grid-template-columns: 320px 2fr 1fr;
+  gap: 1rem;
+  min-height: 580px;
+  width: 100%;
 }
 
-.feature-card {
-  background-color: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s;
+.market-top-left {
+  display: flex;
+  width: 100%;
+  min-width: 0;
 }
 
-.feature-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.market-top-right {
+  display: flex;
+  width: 100%;
+  min-width: 0;
 }
 
-.feature-card h2 {
-  color: #667eea;
-  margin-bottom: 1rem;
+/* Middle Section: Magnificent 7 */
+.market-middle-section {
+  width: 100%;
 }
 
-.getting-started {
-  background-color: #f8f9fa;
-  padding: 2rem;
-  border-radius: 8px;
-  text-align: center;
+/* Bottom Section: Commodity Futures */
+.market-bottom-section {
+  width: 100%;
 }
 
-.getting-started h2 {
-  color: #333;
-  margin-bottom: 1rem;
+/* Responsive Design */
+@media (max-width: 900px) {
+  .market-top-section {
+    grid-template-columns: 1fr;
+  }
+
+  .home-page {
+    padding: 1rem;
+  }
+
+  .market-header h1 {
+    font-size: 1.5rem;
+  }
 }
