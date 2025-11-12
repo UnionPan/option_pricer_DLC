@@ -26,6 +26,7 @@ network:
 # Environment variables
 env_variables:
   DEFAULT_RISK_FREE_RATE: "0.05"
+  ENFORCE_IAP_AUTH: "true"
 
 # Health check
 liveness_check:

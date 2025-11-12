@@ -1,8 +1,9 @@
 """FastAPI application entry point."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.core.config import settings
 from backend.api.v1.api import api_router
+from backend.core.config import settings
+from backend.core.iap import IAPAuthMiddleware
 
 
 app = FastAPI(
@@ -22,6 +23,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Enforce Google IAP when deployed behind App Engine / Cloud IAP
+app.add_middleware(IAPAuthMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)

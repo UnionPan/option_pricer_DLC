@@ -2,7 +2,7 @@ name: Deploy Backend to App Engine
 
 on:
   push:
-    branches: [main]
+    branches: [feature/larx]
     paths:
       - 'backend/**'
       - 'src/**'

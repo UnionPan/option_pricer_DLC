@@ -101,6 +101,43 @@ gcloud run services describe options-desk-frontend \
   --format='value(status.url)'
 ```
 
+### App Engine with IAP (NYU Policy)
+
+The NYU security baseline requires every App Engine app to sit behind Google authentication. The backend already enforces Identity-Aware Proxy (IAP) tokens when `ENFORCE_IAP_AUTH=true`, so deployment boils down to enabling App Engine + IAP and assigning access.
+
+```bash
+# Enable additional services
+gcloud services enable appengine.googleapis.com iap.googleapis.com
+
+# Create the App Engine application once per project
+gcloud app create --region=us-central
+
+# Deploy backend + frontend using the App Engine Cloud Build configs
+COMMIT_SHA=$(git rev-parse HEAD)
+gcloud builds submit --config=deployment/cloudbuild/backend-appengine.yaml --substitutions=COMMIT_SHA=$COMMIT_SHA
+gcloud builds submit --config=deployment/cloudbuild/frontend-appengine.yaml --substitutions=COMMIT_SHA=$COMMIT_SHA
+
+# Turn on IAP for the App Engine application
+gcloud iap web enable --resource-type=app-engine --project $PROJECT_ID
+
+# Grant NYU identities access (repeat per user/group/service account)
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="user:yp1170@nyu.edu" \
+  --role="roles/iap.httpsResourceAccessor"
+```
+
+Only identities with `roles/iap.httpsResourceAccessor` (or a group that contains that role) can reach the UI/API. All other requests are rejected before they hit your code, and the FastAPI middleware double-checks that every inbound request carries a valid `X-Goog-IAP-JWT-Assertion` header.
+
+To manually exercise the backend while the policy is active:
+
+```bash
+TOKEN=$(gcloud auth print-identity-token)
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://REGION-dot-PROJECT_ID.uc.r.appspot.com/api/v1/health"
+```
+
+The middleware automatically skips health checks hitting `/health`, and the IAP audience string is derived from the metadata server. If you prefer to override it manually, set the `IAP_AUDIENCE` environment variable to `/projects/PROJECT_NUMBER/apps/PROJECT_ID`.
+
 ## GitHub Actions CI/CD
 
 ### Setup GitHub Secrets
@@ -167,6 +204,9 @@ Once configured, deployments happen automatically:
 - `DEFAULT_RISK_FREE_RATE`: Default risk-free rate (default: 0.05)
 - `ENABLE_CACHE`: Enable response caching (default: true)
 - `CACHE_TTL_SECONDS`: Cache TTL in seconds (default: 300)
+- `ENFORCE_IAP_AUTH`: Set to `true` on App Engine to require Google IAP tokens
+- `IAP_AUDIENCE`: Optional override for the expected IAP audience (`/projects/<number>/apps/<id>`)
+- `IAP_EXEMPT_PATHS`: JSON list of path prefixes that can bypass IAP (defaults to `["/health"]`)
 
 ### Frontend
 

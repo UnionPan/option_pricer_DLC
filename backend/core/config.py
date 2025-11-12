@@ -1,6 +1,7 @@
 """Backend configuration using environment variables."""
+from typing import List, Optional
+
 from pydantic_settings import BaseSettings
-from typing import List
 
 
 class Settings(BaseSettings):
@@ -26,6 +27,11 @@ class Settings(BaseSettings):
     # Cache Configuration
     ENABLE_CACHE: bool = True
     CACHE_TTL_SECONDS: int = 300  # 5 minutes
+
+    # Authentication / Authorization
+    ENFORCE_IAP_AUTH: bool = False
+    IAP_AUDIENCE: Optional[str] = None
+    IAP_EXEMPT_PATHS: List[str] = ["/health"]
 
     class Config:
         env_file = ".env"
