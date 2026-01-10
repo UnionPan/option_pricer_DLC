@@ -12,9 +12,9 @@ interface OHLCChartProps {
 const OHLCChart: React.FC<OHLCChartProps> = ({ symbol, data }) => {
   const { theme } = useTheme();
 
-  const plotBgColor = theme === 'dark' ? '#1a1a1a' : '#ffffff';
-  const plotTextColor = theme === 'dark' ? '#e5e5e5' : '#1a1a1a';
-  const gridColor = theme === 'dark' ? '#333333' : '#e0e0e0';
+  const plotBgColor = theme === 'dark' ? '#0b1220' : '#ffffff';
+  const plotTextColor = theme === 'dark' ? '#e5e7eb' : '#0f172a';
+  const gridColor = theme === 'dark' ? '#334155' : '#e2e8f0';
 
   return (
     <div className="ohlc-chart-card">

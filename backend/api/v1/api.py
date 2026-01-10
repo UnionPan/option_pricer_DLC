@@ -1,6 +1,6 @@
 """API router aggregator."""
 from fastapi import APIRouter
-from backend.api.v1.endpoints import pricing, data, surface, market, smile
+from backend.api.v1.endpoints import pricing, data, surface, market, smile, calibration, backtesting, rl_hedging
 
 api_router = APIRouter()
 
@@ -10,3 +10,6 @@ api_router.include_router(data.router, prefix="/data", tags=["Data"])
 api_router.include_router(surface.router, prefix="/surface", tags=["Volatility Surface"])
 api_router.include_router(market.router, prefix="/market", tags=["Market"])
 api_router.include_router(smile.router, prefix="/smile", tags=["Volatility Smile"])
+api_router.include_router(calibration.router, prefix="/calibration", tags=["Calibration"])
+api_router.include_router(backtesting.router, prefix="/backtesting", tags=["Backtesting"])
+api_router.include_router(rl_hedging.router, prefix="/rl-hedging", tags=["Deep RL Hedging"])

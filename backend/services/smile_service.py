@@ -10,8 +10,6 @@ from backend.services.advanced_pricing import (
     MertonJumpDiffusion,
     implied_volatility_from_price,
 )
-from options_desk.pricing.black_scholes import black_scholes_price
-from options_desk.core.option import OptionType
 
 
 class SmileService:

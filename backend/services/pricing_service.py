@@ -1,16 +1,12 @@
 """Pricing and Greeks calculation service."""
 import numpy as np
 from scipy.stats import norm
-from options_desk.pricing.black_scholes import (
-    black_scholes_price,
-    black_scholes_delta,
-    black_scholes_gamma,
-    black_scholes_vega,
-    black_scholes_theta,
-    _d1,
-    _d2,
-)
-from options_desk.core.option import OptionType as CoreOptionType
+
+# Use new pricer module
+from options_desk.pricer import BlackScholesPricer
+from options_desk.derivatives import EuropeanCall, EuropeanPut
+from options_desk.processes import GBM
+
 from backend.schemas.pricing import (
     PricingRequest,
     PricingResponse,
@@ -20,115 +16,82 @@ from backend.schemas.pricing import (
 from backend.schemas.common import OptionType
 
 
-def _convert_option_type(option_type: OptionType) -> CoreOptionType:
-    """Convert API option type to core option type."""
-    return CoreOptionType.CALL if option_type == OptionType.CALL else CoreOptionType.PUT
-
-
-def _calculate_rho(
-    spot: float,
-    strike: float,
-    time_to_expiry: float,
-    rate: float,
-    volatility: float,
-    option_type: CoreOptionType,
-    dividend: float = 0.0,
-) -> float:
-    """
-    Calculate option rho using Black-Scholes formula.
-
-    Rho measures the sensitivity of option price to interest rate changes.
-    """
-    if time_to_expiry <= 0:
-        return 0.0
-
-    d_1 = _d1(spot, strike, time_to_expiry, rate, volatility, dividend)
-    d_2 = _d2(d_1, volatility, time_to_expiry)
-
-    if option_type == CoreOptionType.CALL:
-        # Rho per 1% change in interest rate
-        return strike * time_to_expiry * np.exp(-rate * time_to_expiry) * norm.cdf(d_2) / 100
-    else:  # PUT
-        return -strike * time_to_expiry * np.exp(-rate * time_to_expiry) * norm.cdf(-d_2) / 100
-
-
 class PricingService:
     """Service for option pricing and Greeks calculations."""
 
     @staticmethod
     def calculate_price(request: PricingRequest) -> PricingResponse:
         """Calculate option price using Black-Scholes model."""
-        core_option_type = _convert_option_type(request.option_type)
+        # Create derivative based on option type
+        if request.option_type == OptionType.CALL:
+            option = EuropeanCall(
+                strike=request.strike,
+                maturity=request.time_to_expiry,
+            )
+        else:
+            option = EuropeanPut(
+                strike=request.strike,
+                maturity=request.time_to_expiry,
+            )
 
-        price = black_scholes_price(
-            spot=request.spot,
-            strike=request.strike,
-            time_to_expiry=request.time_to_expiry,
-            rate=request.risk_free_rate,
-            volatility=request.volatility,
-            option_type=core_option_type,
-            dividend=request.dividend_yield,
+        # Create GBM process (mu doesn't affect BS price, only sigma matters)
+        process = GBM(mu=request.risk_free_rate, sigma=request.volatility)
+
+        # Create pricer
+        pricer = BlackScholesPricer(
+            risk_free_rate=request.risk_free_rate,
+            dividend_yield=request.dividend_yield,
         )
 
-        return PricingResponse(price=float(price), model="black_scholes")
+        # Price the option
+        result = pricer.price(
+            derivative=option,
+            process=process,
+            X0=request.spot,
+            compute_greeks=False,
+        )
+
+        return PricingResponse(price=float(result.price), model="black_scholes")
 
     @staticmethod
     def calculate_greeks(request: GreeksRequest) -> GreeksResponse:
         """Calculate all Greeks for an option."""
-        core_option_type = _convert_option_type(request.option_type)
+        # Create derivative based on option type
+        if request.option_type == OptionType.CALL:
+            option = EuropeanCall(
+                strike=request.strike,
+                maturity=request.time_to_expiry,
+            )
+        else:
+            option = EuropeanPut(
+                strike=request.strike,
+                maturity=request.time_to_expiry,
+            )
 
-        delta = black_scholes_delta(
-            spot=request.spot,
-            strike=request.strike,
-            time_to_expiry=request.time_to_expiry,
-            rate=request.risk_free_rate,
-            volatility=request.volatility,
-            option_type=core_option_type,
-            dividend=request.dividend_yield,
+        # Create GBM process
+        process = GBM(mu=request.risk_free_rate, sigma=request.volatility)
+
+        # Create pricer
+        pricer = BlackScholesPricer(
+            risk_free_rate=request.risk_free_rate,
+            dividend_yield=request.dividend_yield,
         )
 
-        gamma = black_scholes_gamma(
-            spot=request.spot,
-            strike=request.strike,
-            time_to_expiry=request.time_to_expiry,
-            rate=request.risk_free_rate,
-            volatility=request.volatility,
-            dividend=request.dividend_yield,
+        # Price with Greeks
+        result = pricer.price(
+            derivative=option,
+            process=process,
+            X0=request.spot,
+            compute_greeks=True,
         )
 
-        vega = black_scholes_vega(
-            spot=request.spot,
-            strike=request.strike,
-            time_to_expiry=request.time_to_expiry,
-            rate=request.risk_free_rate,
-            volatility=request.volatility,
-            dividend=request.dividend_yield,
-        )
-
-        theta = black_scholes_theta(
-            spot=request.spot,
-            strike=request.strike,
-            time_to_expiry=request.time_to_expiry,
-            rate=request.risk_free_rate,
-            volatility=request.volatility,
-            option_type=core_option_type,
-            dividend=request.dividend_yield,
-        )
-
-        rho = _calculate_rho(
-            spot=request.spot,
-            strike=request.strike,
-            time_to_expiry=request.time_to_expiry,
-            rate=request.risk_free_rate,
-            volatility=request.volatility,
-            option_type=core_option_type,
-            dividend=request.dividend_yield,
-        )
+        # Extract Greeks from result
+        greeks = result.greeks or {}
 
         return GreeksResponse(
-            delta=float(delta),
-            gamma=float(gamma),
-            vega=float(vega),
-            theta=float(theta),
-            rho=float(rho),
+            delta=float(greeks.get('delta', 0.0)),
+            gamma=float(greeks.get('gamma', 0.0)),
+            vega=float(greeks.get('vega', 0.0)),
+            theta=float(greeks.get('theta', 0.0)),
+            rho=float(greeks.get('rho', 0.0)),
         )
