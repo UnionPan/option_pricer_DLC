@@ -1,3 +1,177 @@
+:root {
+  --app-bg: #f5f7fb;
+  --panel-bg: #ffffff;
+  --panel-bg-alt: #f8fafc;
+  --panel-border: #e2e8f0;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f1f5f9;
+  --border-color: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.15);
+  --accent-secondary: #10b981;
+  --accent-secondary-hover: #059669;
+  --error-bg: #fef2f2;
+  --error-border: #fca5a5;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  --card-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  --positive-color: #22c55e;
+  --negative-color: #ef4444;
+  --positive-soft: rgba(34, 197, 94, 0.12);
+  --negative-soft: rgba(239, 68, 68, 0.12);
+  --error-text: #b91c1c;
+  --sidebar-bg: #0f172a;
+  --sidebar-text: #f8fafc;
+  --sidebar-border: #1e293b;
+  --sidebar-divider: rgba(248, 250, 252, 0.18);
+  --sidebar-hover-bg: rgba(248, 250, 252, 0.08);
+  --sidebar-hover-border: rgba(248, 250, 252, 0.35);
+  --sidebar-active-bg: rgba(248, 250, 252, 0.18);
+  --sidebar-active-border: #f8fafc;
+  --sidebar-shadow: rgba(15, 23, 42, 0.35);
+  --sidebar-shadow-strong: rgba(15, 23, 42, 0.5);
+  --overlay-bg: rgba(15, 23, 42, 0.6);
+  --plot-bg: #ffffff;
+  --plot-text: #0f172a;
+  --plot-grid: #e2e8f0;
+}
+
+:root[data-theme='light'] {
+  --app-bg: #f5f7fb;
+  --panel-bg: #ffffff;
+  --panel-bg-alt: #f8fafc;
+  --panel-border: #e2e8f0;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f1f5f9;
+  --border-color: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.15);
+  --accent-secondary: #10b981;
+  --accent-secondary-hover: #059669;
+  --error-bg: #fef2f2;
+  --error-border: #fca5a5;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  --card-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  --positive-color: #22c55e;
+  --negative-color: #ef4444;
+  --positive-soft: rgba(34, 197, 94, 0.12);
+  --negative-soft: rgba(239, 68, 68, 0.12);
+  --error-text: #b91c1c;
+  --sidebar-bg: #0f172a;
+  --sidebar-text: #f8fafc;
+  --sidebar-border: #1e293b;
+  --sidebar-divider: rgba(248, 250, 252, 0.18);
+  --sidebar-hover-bg: rgba(248, 250, 252, 0.08);
+  --sidebar-hover-border: rgba(248, 250, 252, 0.35);
+  --sidebar-active-bg: rgba(248, 250, 252, 0.18);
+  --sidebar-active-border: #f8fafc;
+  --sidebar-shadow: rgba(15, 23, 42, 0.35);
+  --sidebar-shadow-strong: rgba(15, 23, 42, 0.5);
+  --overlay-bg: rgba(15, 23, 42, 0.6);
+  --plot-bg: #ffffff;
+  --plot-text: #0f172a;
+  --plot-grid: #e2e8f0;
+}
+
+:root[data-theme='dark'] {
+  --app-bg: #0b0f14;
+  --panel-bg: #111827;
+  --panel-bg-alt: #0f172a;
+  --panel-border: #1f2937;
+  --bg-primary: #0b1220;
+  --bg-secondary: #111827;
+  --border-color: #334155;
+  --text-primary: #e5e7eb;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --accent: #22d3ee;
+  --accent-hover: #06b6d4;
+  --accent-soft: rgba(34, 211, 238, 0.15);
+  --accent-secondary: #34d399;
+  --accent-secondary-hover: #10b981;
+  --error-bg: #2b1416;
+  --error-border: #ef4444;
+  --input-bg: #0f172a;
+  --input-border: #334155;
+  --shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  --card-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+  --positive-color: #22c55e;
+  --negative-color: #ef4444;
+  --positive-soft: rgba(34, 197, 94, 0.18);
+  --negative-soft: rgba(239, 68, 68, 0.18);
+  --error-text: #fca5a5;
+  --sidebar-bg: #0b0f14;
+  --sidebar-text: #e5e7eb;
+  --sidebar-border: #1f2937;
+  --sidebar-divider: rgba(226, 232, 240, 0.14);
+  --sidebar-hover-bg: rgba(226, 232, 240, 0.08);
+  --sidebar-hover-border: rgba(226, 232, 240, 0.3);
+  --sidebar-active-bg: rgba(226, 232, 240, 0.16);
+  --sidebar-active-border: #e5e7eb;
+  --sidebar-shadow: rgba(0, 0, 0, 0.45);
+  --sidebar-shadow-strong: rgba(0, 0, 0, 0.6);
+  --overlay-bg: rgba(2, 6, 23, 0.72);
+  --plot-bg: #0b1220;
+  --plot-text: #e5e7eb;
+  --plot-grid: #334155;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --app-bg: #0b0f14;
+    --panel-bg: #111827;
+    --panel-bg-alt: #0f172a;
+    --panel-border: #1f2937;
+    --bg-primary: #0b1220;
+    --bg-secondary: #111827;
+    --border-color: #334155;
+    --text-primary: #e5e7eb;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --accent: #22d3ee;
+    --accent-hover: #06b6d4;
+    --accent-soft: rgba(34, 211, 238, 0.15);
+    --accent-secondary: #34d399;
+    --accent-secondary-hover: #10b981;
+    --error-bg: #2b1416;
+    --error-border: #ef4444;
+    --input-bg: #0f172a;
+    --input-border: #334155;
+    --shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+    --card-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+    --positive-color: #22c55e;
+    --negative-color: #ef4444;
+    --positive-soft: rgba(34, 197, 94, 0.18);
+    --negative-soft: rgba(239, 68, 68, 0.18);
+    --error-text: #fca5a5;
+    --sidebar-bg: #0b0f14;
+    --sidebar-text: #e5e7eb;
+    --sidebar-border: #1f2937;
+    --sidebar-divider: rgba(226, 232, 240, 0.14);
+    --sidebar-hover-bg: rgba(226, 232, 240, 0.08);
+    --sidebar-hover-border: rgba(226, 232, 240, 0.3);
+    --sidebar-active-bg: rgba(226, 232, 240, 0.16);
+    --sidebar-active-border: #e5e7eb;
+    --sidebar-shadow: rgba(0, 0, 0, 0.45);
+    --sidebar-shadow-strong: rgba(0, 0, 0, 0.6);
+    --overlay-bg: rgba(2, 6, 23, 0.72);
+    --plot-bg: #0b1220;
+    --plot-text: #e5e7eb;
+    --plot-grid: #334155;
+  }
+}
+
 body {
   margin: 0;
   font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -5,12 +179,15 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--app-bg);
+  color: var(--text-primary);
 }
 
 * {
   font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
+  box-sizing: border-box;
 }
 
 /* Elegant classical font for branding */

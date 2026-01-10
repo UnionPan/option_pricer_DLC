@@ -41,7 +41,7 @@
 
 .input-field:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--accent);
 }
 
 .toggle-label {
@@ -76,7 +76,7 @@
 }
 
 .toggle-checkbox:checked {
-  background-color: #667eea;
+  background-color: var(--accent);
 }
 
 .toggle-checkbox:checked::before {
@@ -93,7 +93,7 @@
 .build-button {
   padding: 0.75rem 1.5rem;
   font-size: 1rem;
-  background-color: #667eea;
+  background-color: var(--accent);
   color: white;
   border: none;
   border-radius: 4px;
@@ -104,7 +104,7 @@
 }
 
 .build-button:hover {
-  background-color: #5568d3;
+  background-color: var(--accent-hover);
 }
 
 .surface-info {
@@ -112,7 +112,7 @@
 }
 
 .surface-info h2 {
-  color: #667eea;
+  color: var(--accent);
   margin-bottom: 0.5rem;
 }
 

@@ -1,0 +1,14 @@
+.ohlcv-chart {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel-bg);
+}
+
+.chart-empty {
+  padding: 3rem;
+  text-align: center;
+  background: var(--panel-bg-alt);
+  border-radius: 8px;
+  color: var(--text-secondary);
+}

@@ -1,16 +1,16 @@
 .error-message {
-  background-color: #fee;
-  border: 1px solid #fcc;
+  background-color: var(--error-bg);
+  border: 1px solid var(--error-border);
   border-radius: 4px;
   padding: 1rem;
   margin: 1rem 0;
 }
 
 .error-message h3 {
-  color: #c00;
+  color: var(--error-text);
   margin-top: 0;
 }
 
 .error-message p {
-  color: #600;
+  color: var(--text-secondary);
 }

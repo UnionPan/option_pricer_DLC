@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import './App.css';
 import HomePage from './pages/HomePage';
-import OptionChainPage from './pages/OptionChainPage';
-import VolSurfacePage from './pages/VolSurfacePage';
+import CalibrationPage from './pages/CalibrationPage';
+import BacktestingPage from './pages/BacktestingPage';
+import DeepRLHedgingPage from './pages/DeepRLHedgingPage';
 
-type Page = 'market' | 'chain' | 'implied-vol' | 'greeks' | 'hedging' | 'approx-is-hedging' | 'portfolio-risk';
+type Page = 'market' | 'calibration' | 'backtesting' | 'deep-rl-hedging';
 
 interface MenuItem {
   id: Page;
@@ -13,12 +14,9 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { id: 'market', label: 'Market' },
-  { id: 'chain', label: 'Chain & Price' },
-  { id: 'implied-vol', label: 'Implied Vol' },
-  { id: 'greeks', label: 'Greeks' },
-  { id: 'hedging', label: 'Hedging' },
-  { id: 'approx-is-hedging', label: 'Approx IS Hedging' },
-  { id: 'portfolio-risk', label: 'Portfolio Risk' },
+  { id: 'calibration', label: 'Calibration' },
+  { id: 'backtesting', label: 'Backtesting' },
+  { id: 'deep-rl-hedging', label: 'Deep RL Hedging' },
 ];
 
 function App() {
@@ -34,18 +32,12 @@ function App() {
     switch (currentPage) {
       case 'market':
         return <HomePage />;
-      case 'chain':
-        return <OptionChainPage />;
-      case 'implied-vol':
-        return <VolSurfacePage />;
-      case 'greeks':
-        return <div className="page-placeholder">Greeks Page - Coming Soon</div>;
-      case 'hedging':
-        return <div className="page-placeholder">Hedging Page - Coming Soon</div>;
-      case 'approx-is-hedging':
-        return <div className="page-placeholder">Approx IS Hedging Page - Coming Soon</div>;
-      case 'portfolio-risk':
-        return <div className="page-placeholder">Portfolio Risk Page - Coming Soon</div>;
+      case 'calibration':
+        return <CalibrationPage />;
+      case 'backtesting':
+        return <BacktestingPage />;
+      case 'deep-rl-hedging':
+        return <DeepRLHedgingPage />;
       default:
         return <HomePage />;
     }

@@ -1,0 +1,294 @@
+.calibration-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.result-card {
+  background: var(--panel-bg);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--accent);
+}
+
+/* Header Section */
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--panel-border);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.result-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.ticker-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--accent);
+  color: white;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.timestamp {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Section Headers */
+.parameters-section,
+.diagnostics-section {
+  margin-bottom: 24px;
+}
+
+.parameters-section:last-child,
+.diagnostics-section:last-child {
+  margin-bottom: 0;
+}
+
+.parameters-section h4,
+.diagnostics-section h4 {
+  margin: 0 0 16px 0;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Table Container */
+.table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+}
+
+/* Table Styling */
+.parameters-table,
+.diagnostics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.parameters-table thead,
+.diagnostics-table thead {
+  background: var(--panel-bg-alt);
+}
+
+.parameters-table th,
+.diagnostics-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--panel-border);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.parameters-table td,
+.diagnostics-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--text-secondary);
+}
+
+.parameters-table tbody tr:last-child td,
+.diagnostics-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.parameters-table tbody tr:hover,
+.diagnostics-table tbody tr:hover {
+  background: var(--panel-bg-alt);
+}
+
+/* Column-specific styling */
+.value-column {
+  width: 150px;
+  text-align: right;
+}
+
+.description-column {
+  min-width: 250px;
+}
+
+/* Parameter Table Cells */
+.param-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.param-symbol {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.param-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.param-description {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Diagnostics Table Cells */
+.diag-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.diag-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.diag-interpretation {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Diagnostic Note */
+.diagnostic-note {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.diagnostic-note strong {
+  color: var(--text-primary);
+  margin-right: 8px;
+}
+
+/* Method Info Badges */
+.method-info {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.info-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--panel-bg-alt);
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+}
+
+.info-badge .label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.info-badge .value {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .description-column {
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .result-card {
+    padding: 16px;
+  }
+
+  .result-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .result-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .table-container {
+    border-radius: 6px;
+  }
+
+  .parameters-table th,
+  .diagnostics-table th,
+  .parameters-table td,
+  .diagnostics-table td {
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+  }
+
+  /* Hide descriptions on mobile for cleaner layout */
+  .description-column {
+    display: none;
+  }
+
+  .method-info {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .info-badge {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Stack table on very small screens */
+  .parameters-table,
+  .diagnostics-table {
+    font-size: 0.75rem;
+  }
+
+  .param-symbol,
+  .param-value,
+  .diag-value {
+    font-size: 0.875rem;
+  }
+}

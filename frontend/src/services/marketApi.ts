@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { MarketOverviewResponse, IndexChartsResponse, OHLCChartResponse } from '../types/market';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+import { API_BASE_URL } from '../config/api.config';
 
 export const marketApi = {
   getMarketOverview: async (): Promise<MarketOverviewResponse> => {

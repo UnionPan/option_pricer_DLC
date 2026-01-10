@@ -1,0 +1,27 @@
+[
+  {
+    "ticker": "MSFT",
+    "model": "heston",
+    "parameters": {
+      "kappa": 2,
+      "theta": 0.0001938215115473229,
+      "xi": 0.5,
+      "v0": 0.0001938215115473229,
+      "rho": -0.03356191519708131,
+      "mu": 0.11309856440506752
+    },
+    "diagnostics": {
+      "logLikelihood": 1380.5693072226254,
+      "aic": null,
+      "bic": null,
+      "mean_ess": 1649.7066316177038,
+      "n_particles": 2000,
+      "variogram_r2": null,
+      "errorMetrics": {},
+      "note": "Particle filter-based estimation with empirical rho from return-volatility correlation."
+    },
+    "timestamp": "2026-01-09T23:06:06.734437",
+    "method": "particle_filter",
+    "measure": "P-measure"
+  }
+]
