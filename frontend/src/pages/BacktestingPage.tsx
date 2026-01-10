@@ -759,7 +759,7 @@ const BacktestingPage: React.FC = () => {
                                   project: { z: true }
                                 }
                               },
-                            },
+                            } as any,
                           ]}
                           layout={{
                             title: { text: `IV Surface (t=${currentStep})`, font: { size: 12 } },
@@ -895,7 +895,7 @@ const BacktestingPage: React.FC = () => {
                             line: { color: '#2E7D32', width: 1 },
                           },
                           nbinsx: 40,
-                        },
+                        } as any,
                       ]}
                       layout={{
                         title: { text: `Final P&L Distribution (${backtestResult.final_pnl_distribution.length} paths)`, font: { size: 14 } },
