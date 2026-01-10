@@ -98,7 +98,7 @@ const ModelConfiguration: React.FC<ModelConfigurationProps> = ({
         onConfigChange({ calibrationMethod: availableMethods[0].value });
       }
     }
-  }, [config.model, measureType, availableMethods]);
+  }, [config.model, config.calibrationMethod, measureType, availableMethods, onConfigChange]);
 
   return (
     <div className="model-configuration">

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import Plot from 'react-plotly.js';
 import './VolatilitySurface3D.css';
 import { OptionChainData } from '../../services/calibrationApi';
