@@ -696,7 +696,7 @@ const BacktestingPage: React.FC = () => {
                     }}>
                       Loading option chain visualization...
                       {backtestResult.option_chains === undefined && ' (chains undefined)'}
-                      {backtestResult.option_chains !== undefined && backtestResult.option_chains.length === 0 && ' (chains empty)'}
+                      {backtestResult.option_chains != null && backtestResult.option_chains.length === 0 && ' (chains empty)'}
                     </div>
                   )}
 
