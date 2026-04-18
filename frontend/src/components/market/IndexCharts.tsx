@@ -11,14 +11,14 @@ interface IndexChartsProps {
 const IndexCharts: React.FC<IndexChartsProps> = ({ charts }) => {
   const { theme } = useTheme();
 
-  const plotBgColor = theme === 'dark' ? '#0b1220' : '#ffffff';
-  const plotTextColor = theme === 'dark' ? '#e5e7eb' : '#0f172a';
-  const gridColor = theme === 'dark' ? '#334155' : '#e2e8f0';
+  const plotBgColor = 'rgba(0,0,0,0)';
+  const plotTextColor = theme === 'dark' ? '#94a3b8' : '#475569';
+  const gridColor = theme === 'dark' ? 'rgba(148,163,184,0.08)' : 'rgba(15,23,42,0.06)';
 
   // Define colors for each index
   const indexColors = {
-    'S&P 500': '#667eea',
-    'NASDAQ': '#22c55e',
+    'S&P 500': '#06b6d4',
+    'NASDAQ': '#818cf8',
   };
 
   // Normalize data to percentage change from first data point

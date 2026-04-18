@@ -1,18 +1,10 @@
 import React, { useState } from 'react';
 import './DeepRLHedgingPage.css';
 import Plot from 'react-plotly.js';
-import { rlHedgingApi, RLInferenceResponse } from '../services/rlHedgingApi';
+import { rlHedgingApi } from '../services/rlHedgingApi';
 import { useTheme } from '../contexts/ThemeContext';
 
 type AgentType = 'ppo' | 'sac' | 'td3' | 'deep_hedging' | 'ais_hedging';
-
-interface AgentConfig {
-  type: AgentType;
-  name: string;
-  description: string;
-  modelFile: File | null;
-  isDemo: boolean;
-}
 
 interface SimulationConfig {
   s0: number;

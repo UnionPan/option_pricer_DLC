@@ -7,7 +7,9 @@ author: Yunian Pan
 email: yp1170@nyu.edu
 """
 import numpy as np
+import warnings
 from .Levy import SubordinatedBrownianMotion
+from ._jax_backend import should_fallback_to_numpy
 
 
 class NIG(SubordinatedBrownianMotion):
@@ -75,6 +77,34 @@ class NIG(SubordinatedBrownianMotion):
         self.params['delta'] = self.delta
         self.params['mu'] = self.mu
         self.params['gamma'] = self.gamma
+
+    def simulate(self, X0, T, config, scheme='euler'):
+        from .base import _JAX_AVAILABLE, validate_simulation_config
+        validate_simulation_config(config)
+        if (
+            _JAX_AVAILABLE
+            and scheme.lower() in ("euler", "milstein")
+            and not config.use_sobol
+        ):
+            from ._process_defs import NIGParams, nig_increment_fn, levy_simulate
+            seed = config.random_seed if config.random_seed is not None else 0
+            try:
+                return levy_simulate(
+                    nig_increment_fn,
+                    NIGParams(alpha=self.alpha, beta=self.beta,
+                              delta=self.delta, mu=self.mu),
+                    X0, T, config.n_paths, config.n_steps,
+                    seed=seed, dim=self.dim, antithetic=config.antithetic,
+                )
+            except Exception as exc:
+                if not should_fallback_to_numpy(exc):
+                    raise
+                warnings.warn(
+                    "JAX backend initialization failed for NIG; falling back to NumPy simulation.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+        return super().simulate(X0, T, config, scheme=scheme)
 
     def _simulate_subordinator(self, dt: float, n_paths: int) -> np.ndarray:
         """

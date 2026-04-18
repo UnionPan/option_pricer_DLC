@@ -1,25 +1,30 @@
 .model-configuration {
   background: var(--panel-bg);
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: var(--shadow);
-  margin-bottom: 1.5rem;
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .model-configuration h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.125rem;
+  margin: 0 0 0.625rem 0;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .config-group {
-  margin-bottom: 1rem;
+  margin-bottom: 0.625rem;
 }
 
 .config-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 0.5rem;
 }
 
 .config-row .config-group {
@@ -28,22 +33,25 @@
 
 .config-group label {
   display: block;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
-  font-weight: 500;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .config-select,
 .config-input {
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 2px solid var(--panel-border);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  transition: border-color 0.2s;
-  background: var(--input-bg);
+  padding: 0.3125rem 0.5rem;
+  border: 2px solid;
+  border-color: var(--bevel-dark) var(--bevel-light) var(--bevel-light) var(--bevel-dark);
+  font-size: 0.8125rem;
+  background: var(--well-bg);
   color: var(--text-primary);
+  font-family: 'IBM Plex Mono', 'Lucida Console', monospace;
+  border-radius: 0;
 }
 
 .config-select:focus,
@@ -52,88 +60,103 @@
   border-color: var(--accent);
 }
 
+/* ── Checkbox ── */
 .checkbox-group {
-  padding: 0.75rem;
-  background: var(--panel-bg-alt);
-  border-radius: 6px;
+  padding: 0.5rem;
+  background: var(--well-bg);
+  border: 2px solid;
+  border-color: var(--well-border-top) var(--well-border-right) var(--well-border-bottom) var(--well-border-left);
+  border-radius: 0;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--text-primary);
   margin-bottom: 0;
 }
 
 .config-checkbox {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   cursor: pointer;
 }
 
 .helper-text {
-  margin: 0.5rem 0 0 0;
-  font-size: 0.75rem;
+  margin: 0.375rem 0 0 0;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   font-style: italic;
 }
 
+/* ── Info Box ── */
 .config-info {
-  padding: 1rem;
-  background: var(--accent-soft);
-  border-left: 4px solid var(--accent);
-  border-radius: 6px;
-  margin-top: 1rem;
+  padding: 0.5rem;
+  background: var(--well-bg);
+  border: 2px solid;
+  border-color: var(--well-border-top) var(--well-border-right) var(--well-border-bottom) var(--well-border-left);
+  border-left: 3px solid var(--accent);
+  margin-top: 0.625rem;
+  border-radius: 0;
 }
 
 .config-info .helper-text {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-style: normal;
+  font-size: 0.6875rem;
 }
 
 .config-info strong {
   color: var(--text-primary);
 }
 
+/* ── Date Presets — raised grid buttons ── */
 .date-presets {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--panel-border);
+  margin-top: 0.625rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--border-color);
 }
 
 .date-presets label {
   display: block;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
-  font-weight: 500;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  margin-bottom: 0.375rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .preset-buttons {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 0.5rem;
+  gap: 2px;
 }
 
 .preset-btn {
-  padding: 0.5rem;
-  background: var(--panel-bg-alt);
+  padding: 0.25rem;
+  background: var(--panel-bg);
   color: var(--text-primary);
-  border: 2px solid var(--border-color);
-  border-radius: 6px;
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
   cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 500;
-  transition: all 0.2s;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-align: center;
+  font-family: 'IBM Plex Mono', 'Lucida Console', monospace;
+  border-radius: 0;
 }
 
 .preset-btn:hover {
-  border-color: var(--accent);
-  background: var(--panel-bg);
+  background: var(--panel-bg-alt);
+}
+
+.preset-btn:active {
+  border-color: var(--bevel-dark) var(--bevel-light) var(--bevel-light) var(--bevel-dark);
 }
 
 @media (max-width: 768px) {

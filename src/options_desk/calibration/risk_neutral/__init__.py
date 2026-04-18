@@ -16,6 +16,26 @@ from .regime_switching_heston_calibrator import (
     RegimeSwitchingHestonResult,
     RegimeHestonParameters,
 )
+from .cf_calibrator import (
+    CFCalibrator,
+    CFCalibrationResult,
+    make_merton_calibrator,
+    make_vg_calibrator,
+    make_nig_calibrator,
+    make_kou_calibrator,
+    make_bates_calibrator,
+)
+from .svi import (
+    SVIParams,
+    SSVIParams,
+    SVIFitResult,
+    SSVIFitResult,
+    fit_svi_slice,
+    fit_ssvi_surface,
+    fit_svi_from_chain,
+    check_butterfly_arbitrage,
+    check_calendar_arbitrage,
+)
 
 __all__ = [
     # Heston stochastic volatility
@@ -35,4 +55,24 @@ __all__ = [
     'RegimeSwitchingHestonSimulator',
     'RegimeSwitchingHestonResult',
     'RegimeHestonParameters',
+
+    # Generic CF calibrator + model-specific factories
+    'CFCalibrator',
+    'CFCalibrationResult',
+    'make_merton_calibrator',
+    'make_vg_calibrator',
+    'make_nig_calibrator',
+    'make_kou_calibrator',
+    'make_bates_calibrator',
+
+    # SVI / SSVI volatility surface
+    'SVIParams',
+    'SSVIParams',
+    'SVIFitResult',
+    'SSVIFitResult',
+    'fit_svi_slice',
+    'fit_ssvi_surface',
+    'fit_svi_from_chain',
+    'check_butterfly_arbitrage',
+    'check_calendar_arbitrage',
 ]

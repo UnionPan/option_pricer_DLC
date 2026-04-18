@@ -7,7 +7,9 @@ author: Yunian Pan
 email: yp1170@nyu.edu
 """
 import numpy as np
+import warnings
 from .regime_switching import RegimeSwitchingProcess
+from ._jax_backend import should_fallback_to_numpy
 
 
 class RegimeSwitchingMerton(RegimeSwitchingProcess):
@@ -52,6 +54,56 @@ class RegimeSwitchingMerton(RegimeSwitchingProcess):
         self.regime_params['lambda'] = None
         self.regime_params['mu_J'] = None
         self.regime_params['sigma_J'] = None
+
+    def simulate(self, X0, T, config, scheme='euler'):
+        from .base import _JAX_AVAILABLE, validate_simulation_config
+        validate_simulation_config(config)
+        if (
+            _JAX_AVAILABLE
+            and scheme.lower() in ("euler", "milstein")
+            and not config.use_sobol
+            and self.transition_matrix is not None
+            and all(
+                self.regime_params.get(name) is not None
+                for name in ('mu', 'sigma', 'lambda', 'mu_J', 'sigma_J')
+            )
+        ):
+            import jax.numpy as jnp
+            from ._process_defs import (
+                RegimeSwitchingMertonParams,
+                regime_switching_merton_simulate,
+            )
+
+            seed = config.random_seed if config.random_seed is not None else 0
+            try:
+                t_grid, paths, _ = regime_switching_merton_simulate(
+                    RegimeSwitchingMertonParams(
+                        mus=jnp.array(self.regime_params['mu']),
+                        sigmas=jnp.array(self.regime_params['sigma']),
+                        lambdas=jnp.array(self.regime_params['lambda']),
+                        mu_js=jnp.array(self.regime_params['mu_J']),
+                        sigma_js=jnp.array(self.regime_params['sigma_J']),
+                        Q=jnp.array(self.transition_matrix),
+                    ),
+                    X0,
+                    T,
+                    config.n_paths,
+                    config.n_steps,
+                    seed=seed,
+                    dim=self.dim,
+                    antithetic=config.antithetic,
+                )
+                return t_grid, paths
+            except Exception as exc:
+                if not should_fallback_to_numpy(exc):
+                    raise
+                warnings.warn(
+                    "JAX backend initialization failed for RegimeSwitchingMerton; falling back to NumPy simulation.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+
+        return super().simulate(X0, T, config, scheme=scheme)
 
     def drift_regime(self, X: np.ndarray, t: float, regime: int) -> np.ndarray:
         """

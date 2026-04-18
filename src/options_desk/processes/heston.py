@@ -91,6 +91,25 @@ class Heston(MultiFactorProcess):
         self.feller_condition = 2 * self.kappa * self.theta > self.sigma_v**2
         self.params['feller_satisfied'] = self.feller_condition
 
+    def _build_jax_spec(self):
+        if self.variance_scheme != "truncation":
+            return None
+        from ._process_defs import (
+            HestonParams, heston_drift, heston_diffusion,
+            heston_post_step, heston_cholesky,
+        )
+        return {
+            'drift_fn': heston_drift,
+            'diffusion_fn': heston_diffusion,
+            'params': HestonParams(
+                mu=self.mu, kappa=self.kappa, theta=self.theta,
+                sigma_v=self.sigma_v, rho=self.rho,
+            ),
+            'dim': 2,
+            'cholesky': heston_cholesky(self.rho),
+            'post_step_fn': heston_post_step,
+        }
+
     def drift(self, X: np.ndarray, t: float) -> np.ndarray:
         """
         Drift term for Heston model

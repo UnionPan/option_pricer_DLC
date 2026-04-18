@@ -12,9 +12,6 @@ Author: Yunian Pan
 Email: yp1170@nyu.edu
 """
 
-import sys
-sys.path.insert(0, 'src')
-
 import numpy as np
 try:
     import gymnasium as gym
@@ -304,6 +301,10 @@ class HestonEnv(gym.Env if gym else object):
         if self.include_options:
             # For Buehler grid: use adaptive moneyness by maturity
             # For uniform grid: use single moneyness list for all maturities
+            # Maturities represent trading-day steps (dt=1/252), so use
+            # trading-day convention for year-fraction conversion.
+            _dpy = 1.0 / self.dt  # typically 252
+
             if self.use_buehler_grid:
                 # Pass maturity-specific moneyness grid (adaptive)
                 self.option_generator = SyntheticEquityOptionChainGenerator(
@@ -311,6 +312,7 @@ class HestonEnv(gym.Env if gym else object):
                     moneyness_by_maturity=self.option_grid,  # Adaptive grid
                     add_noise=False,
                     random_seed=42,
+                    days_per_year=_dpy,
                 )
             else:
                 # Pass uniform moneyness for all maturities
@@ -319,6 +321,7 @@ class HestonEnv(gym.Env if gym else object):
                     moneyness_range=self.option_moneyness,  # Uniform grid
                     add_noise=False,
                     random_seed=42,
+                    days_per_year=_dpy,
                 )
 
             # Features per option: [normalized_price, IV]
@@ -363,6 +366,7 @@ class HestonEnv(gym.Env if gym else object):
                     shape=(self.n_instruments,),
                     dtype=np.float32
                 ),
+                'action_mask': spaces.MultiBinary(self.n_instruments),
             })
         else:
             self.observation_space = spaces.Box(
@@ -381,6 +385,7 @@ class HestonEnv(gym.Env if gym else object):
         self.hedge_portfolio_value = None  # Portfolio + liability MTM
         self.current_option_chain = None
         self.option_grid_prices = None  # Mid prices on fixed grid
+        self.action_mask = np.ones(self.n_instruments, dtype=bool)
         self.path = None  # Pre-simulated full path
         self.liability_mtm = None  # Current liability mark-to-market
         self.prev_hedge_error = None  # Previous hedge error for incremental rewards
@@ -442,6 +447,8 @@ class HestonEnv(gym.Env if gym else object):
         # Generate initial option chain
         if self.include_options:
             self._generate_option_chain()
+            self.action_mask = self._build_action_mask()
+            self._apply_action_mask_to_option_prices()
 
         # Price liability (for hedging task)
         if self.liability is not None:
@@ -502,11 +509,13 @@ class HestonEnv(gym.Env if gym else object):
 
         # Clip action to position limits
         action = np.clip(action, -self.position_limits, self.position_limits)
+        action = np.where(self.action_mask, action, 0.0).astype(np.float32)
 
         # Store old state
         old_positions = self.positions.copy()
         old_portfolio_value = self.portfolio_value
         S_old = self.S
+        previous_action_mask = self.action_mask.copy()
 
         # Compute position changes
         position_changes = action - old_positions
@@ -526,10 +535,12 @@ class HestonEnv(gym.Env if gym else object):
         # Generate option chain at new state
         if self.include_options:
             self._generate_option_chain()
+            self.action_mask = self._build_action_mask()
 
-            # Settle any expired options on the grid
-            settlement_pnl = self._settle_expired_options()
+            # Settle positions that have rolled outside the remaining horizon.
+            settlement_pnl = self._settle_unavailable_options(previous_action_mask)
             self.cash += settlement_pnl
+            self._apply_action_mask_to_option_prices()
 
         # Update liability MTM (for hedging task)
         if self.liability is not None:
@@ -581,7 +592,7 @@ class HestonEnv(gym.Env if gym else object):
         return obs, reward, terminated, truncated, info
 
     def _generate_option_chain(self):
-        """Generate option chain on fixed grid at current state."""
+        """Generate option chain on the configured grid at current state."""
         if not self.include_options:
             return
 
@@ -605,6 +616,31 @@ class HestonEnv(gym.Env if gym else object):
 
         # Extract prices on fixed grid (consistent ordering)
         self.option_grid_prices = self._extract_grid_prices()
+
+    def _build_action_mask(self) -> np.ndarray:
+        """
+        Build the floating-grid availability mask for the current time step.
+
+        The Gym env preserves a fixed action shape, but maturities that extend
+        beyond the remaining episode horizon are masked out.
+        """
+        remaining_steps = max(self.max_steps - self.t, 0)
+        mask = [True]
+        for ttm in sorted(self.option_grid.keys()):
+            available = ttm <= remaining_steps
+            for _ in self.option_grid[ttm]:
+                mask.extend([available, available])
+        return np.asarray(mask, dtype=bool)
+
+    def _apply_action_mask_to_option_prices(self) -> None:
+        """Zero out non-tradable option slots in the public grid-price view."""
+        if self.option_grid_prices is None:
+            return
+        self.option_grid_prices = np.where(
+            self.action_mask[1:],
+            self.option_grid_prices,
+            0.0,
+        ).astype(np.float32)
 
     def _extract_grid_prices(self) -> np.ndarray:
         """
@@ -809,6 +845,7 @@ class HestonEnv(gym.Env if gym else object):
             'option_features': option_features,
             'time_step': np.array([self.t], dtype=np.float32),
             'portfolio_weights': portfolio_weights.astype(np.float32),
+            'action_mask': self.action_mask.copy(),
         }
 
         return obs
@@ -873,7 +910,9 @@ class HestonEnv(gym.Env if gym else object):
                 else:
                     features.extend([0.0, 0.0])
 
-        return np.array(features, dtype=np.float32)
+        feature_array = np.array(features, dtype=np.float32)
+        option_feature_mask = np.repeat(self.action_mask[1:], 2)
+        return np.where(option_feature_mask, feature_array, 0.0).astype(np.float32)
 
     def _record_state(self, action: np.ndarray, reward: float, cost: float):
         """Record current state to history."""
@@ -901,6 +940,7 @@ class HestonEnv(gym.Env if gym else object):
             'portfolio_value': self.portfolio_value,
             'volatility': np.sqrt(self.v),
             'n_instruments': self.n_instruments,
+            'action_mask': self.action_mask.copy(),
         }
 
         if self.include_options and self.current_option_chain is not None:
@@ -1003,6 +1043,30 @@ class HestonEnv(gym.Env if gym else object):
                     self.positions[1 + idx] = 0.0
 
         return total_pnl
+
+    def _settle_unavailable_options(self, previous_action_mask: np.ndarray) -> float:
+        """
+        Liquidate positions whose grid buckets are no longer tradable.
+
+        This gives the fixed-shape Gym env floating-grid semantics: when a
+        maturity bucket no longer fits in the remaining episode horizon, its
+        positions are marked to market and zeroed out.
+        """
+        if not self.include_options or self.option_grid_prices is None:
+            return 0.0
+
+        newly_unavailable = previous_action_mask[1:] & ~self.action_mask[1:]
+        if not np.any(newly_unavailable):
+            return 0.0
+
+        settlement = float(
+            np.dot(
+                self.positions[1:][newly_unavailable],
+                self.option_grid_prices[newly_unavailable],
+            )
+        )
+        self.positions[1:][newly_unavailable] = 0.0
+        return settlement
 
     def _price_liability(self):
         """

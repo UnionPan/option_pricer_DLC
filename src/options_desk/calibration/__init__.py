@@ -21,6 +21,9 @@ from . import physical
 # Q-measure (risk-neutral) calibrators
 from . import risk_neutral
 
+# Joint P/Q calibration
+from .joint_pq import JointPQCalibrator, JointPQResult
+
 # Legacy imports for backwards compatibility
 try:
     from .historical import (
@@ -93,4 +96,8 @@ __all__ = [
     'RegimeSwitchingHestonSimulator',
     'RegimeSwitchingHestonResult',
     'RegimeHestonParameters',
+
+    # Joint P/Q calibration
+    'JointPQCalibrator',
+    'JointPQResult',
 ]

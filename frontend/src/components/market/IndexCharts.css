@@ -1,8 +1,7 @@
 .index-charts-card {
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 1rem;
-  box-shadow: 0 2px 8px var(--card-shadow);
+  background: var(--panel-bg);
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
   height: 100%;
   width: 100%;
   display: flex;
@@ -10,11 +9,14 @@
 }
 
 .combined-chart-wrapper {
-  background: var(--bg-primary);
-  border-radius: 6px;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
   flex: 1;
-  min-height: 500px;
+  min-height: 420px;
   width: 100%;
+  margin: 0.375rem;
+  padding: 0.25rem;
+  background: var(--well-bg);
+  border: 2px solid;
+  border-color: var(--well-border-top) var(--well-border-right) var(--well-border-bottom) var(--well-border-left);
+  /* width adjusts for margins */
+  width: calc(100% - 0.75rem);
 }

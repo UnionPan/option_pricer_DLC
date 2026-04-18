@@ -1,14 +1,18 @@
 .ohlcv-chart {
   width: 100%;
-  border-radius: 8px;
   overflow: hidden;
   background: var(--panel-bg);
+  padding: 0.375rem;
+  margin: 0.375rem;
+  width: calc(100% - 0.75rem);
 }
 
 .chart-empty {
-  padding: 3rem;
+  padding: 2rem;
   text-align: center;
-  background: var(--panel-bg-alt);
-  border-radius: 8px;
-  color: var(--text-secondary);
+  background: var(--well-bg);
+  border: 2px solid;
+  border-color: var(--well-border-top) var(--well-border-right) var(--well-border-bottom) var(--well-border-left);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
 }

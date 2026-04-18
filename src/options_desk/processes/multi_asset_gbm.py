@@ -64,6 +64,18 @@ class MultiAssetGBM(MultiFactorProcess):
         self.params['sigma'] = self.sigma
         self.params['n_assets'] = n_assets
 
+    def _build_jax_spec(self):
+        from ._process_defs import (
+            MultiAssetGBMParams, multi_asset_gbm_drift, multi_asset_gbm_diffusion,
+        )
+        return {
+            'drift_fn': multi_asset_gbm_drift,
+            'diffusion_fn': multi_asset_gbm_diffusion,
+            'params': MultiAssetGBMParams(mus=self.mu, sigmas=self.sigma),
+            'dim': self.dim,
+            'cholesky': self.cholesky_decomp,
+        }
+
     def drift(self, X: np.ndarray, t: float) -> np.ndarray:
         """
         Drift term: mu_i * S_i for each asset

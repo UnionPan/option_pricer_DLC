@@ -64,6 +64,21 @@ class KouJD(JumpDiffusionProcess):
         self.params['eta_up'] = self.eta_up
         self.params['eta_down'] = self.eta_down
 
+    def _build_jax_spec(self):
+        from ._process_defs import (
+            KouJDParams, kou_drift, kou_diffusion, kou_jump_fn,
+        )
+        return {
+            'drift_fn': kou_drift,
+            'diffusion_fn': kou_diffusion,
+            'params': KouJDParams(
+                mu=self.mu, sigma=self.sigma, lambda_j=self.jump_intensity,
+                p=self.p, eta_up=self.eta_up, eta_down=self.eta_down,
+            ),
+            'dim': 1,
+            'jump_fn': kou_jump_fn,
+        }
+
     def drift(self, X: np.ndarray, t: float) -> np.ndarray:
         """
         Drift term: mu * S_t

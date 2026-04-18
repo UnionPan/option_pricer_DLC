@@ -70,6 +70,16 @@ class CEV(DriftDiffusionProcess):
         else:
             self.params['model_type'] = 'CEV'
 
+    def _build_jax_spec(self):
+        from ._process_defs import CEVParams, cev_drift, cev_diffusion, cev_diffusion_deriv
+        return {
+            'drift_fn': cev_drift,
+            'diffusion_fn': cev_diffusion,
+            'params': CEVParams(mu=self.mu, sigma=self.sigma, beta=self.beta),
+            'dim': 1,
+            'diffusion_deriv_fn': cev_diffusion_deriv,
+        }
+
     def drift(self, X: np.ndarray, t: float) -> np.ndarray:
         """
         Drift term: mu * S_t

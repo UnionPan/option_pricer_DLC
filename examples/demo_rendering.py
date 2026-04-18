@@ -98,7 +98,7 @@ def run_demo_with_rendering(n_steps: int = 100, update_interval: int = 1, use_de
     for step in range(n_steps):
         # Get action from agent or random
         if use_delta_agent:
-            action = agent.select_action(obs, info)
+            action = agent.act(obs, info)
         else:
             action = env.action_space.sample()
 

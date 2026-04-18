@@ -10,12 +10,12 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<Theme>('light');
+  const [theme, setTheme] = useState<Theme>('dark');
 
   useEffect(() => {
-    // Check system preference
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setTheme(mediaQuery.matches ? 'dark' : 'light');
+    // Default dark for quant terminal aesthetic; respect explicit light preference
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
+    setTheme(mediaQuery.matches ? 'light' : 'dark');
 
     // Listen for system theme changes
     const handler = (e: MediaQueryListEvent) => {

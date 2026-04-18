@@ -12,8 +12,10 @@ email: yp1170@nyu.edu
 
 from typing import Tuple
 import numpy as np
+import warnings
 
 from .base import MultiFactorProcess, SimulationConfig
+from ._jax_backend import should_fallback_to_numpy
 
 
 class RoughBergomi(MultiFactorProcess):
@@ -74,6 +76,32 @@ class RoughBergomi(MultiFactorProcess):
         Returns:
             t_grid, paths with shape (n_steps+1, n_paths, 2) for [S, v]
         """
+        from .base import _JAX_AVAILABLE, validate_simulation_config
+        validate_simulation_config(config)
+        if (
+            _JAX_AVAILABLE
+            and scheme.lower() in ("euler", "milstein")
+            and not config.use_sobol
+        ):
+            from ._process_defs import RoughBergomiParams, rough_bergomi_simulate
+            seed = config.random_seed if config.random_seed is not None else 0
+            try:
+                return rough_bergomi_simulate(
+                    RoughBergomiParams(
+                        mu=self.mu, xi0=self.xi0, eta=self.eta,
+                        rho=self.rho, H=self.H,
+                    ),
+                    X0, T, config.n_paths, config.n_steps, seed=seed,
+                )
+            except Exception as exc:
+                if not should_fallback_to_numpy(exc):
+                    raise
+                warnings.warn(
+                    "JAX backend initialization failed for RoughBergomi; falling back to NumPy simulation.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+
         if config.random_seed is not None:
             np.random.seed(config.random_seed)
 

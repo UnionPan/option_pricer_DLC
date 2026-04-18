@@ -46,6 +46,10 @@ from .rough_bergomi_particle_filter import (
     RoughBergomiParticleFilter,
     RoughBergomiParticleFilterResult,
 )
+from .correlation import (
+    CorrelationCalibrator,
+    CorrelationResult,
+)
 
 __all__ = [
     # GBM
@@ -90,4 +94,8 @@ __all__ = [
     'HestonParticleFilterResult',
     'RoughBergomiParticleFilter',
     'RoughBergomiParticleFilterResult',
+
+    # Correlation
+    'CorrelationCalibrator',
+    'CorrelationResult',
 ]
