@@ -93,7 +93,7 @@ class DeltaHedgingAgent(BaseHedgingAgent):
         self.target_underlying_position = 0.0
         self.last_hedge_delta = 0.0
 
-    def select_action(
+    def act(
         self,
         observation: Dict[str, np.ndarray],
         info: Dict[str, Any],

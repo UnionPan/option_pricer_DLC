@@ -7,7 +7,9 @@ author: Yunian Pan
 email: yp1170@nyu.edu
 """
 import numpy as np
+import warnings
 from .Levy import SubordinatedBrownianMotion
+from ._jax_backend import should_fallback_to_numpy
 
 
 class VarianceGamma(SubordinatedBrownianMotion):
@@ -56,6 +58,33 @@ class VarianceGamma(SubordinatedBrownianMotion):
         self.params['theta'] = self.theta
         self.params['sigma'] = self.sigma
         self.params['nu'] = self.nu
+
+    def simulate(self, X0, T, config, scheme='euler'):
+        from .base import _JAX_AVAILABLE, validate_simulation_config
+        validate_simulation_config(config)
+        if (
+            _JAX_AVAILABLE
+            and scheme.lower() in ("euler", "milstein")
+            and not config.use_sobol
+        ):
+            from ._process_defs import VGParams, vg_increment_fn, levy_simulate
+            seed = config.random_seed if config.random_seed is not None else 0
+            try:
+                return levy_simulate(
+                    vg_increment_fn,
+                    VGParams(theta=self.theta, sigma=self.sigma, nu=self.nu),
+                    X0, T, config.n_paths, config.n_steps,
+                    seed=seed, dim=self.dim, antithetic=config.antithetic,
+                )
+            except Exception as exc:
+                if not should_fallback_to_numpy(exc):
+                    raise
+                warnings.warn(
+                    "JAX backend initialization failed for VarianceGamma; falling back to NumPy simulation.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+        return super().simulate(X0, T, config, scheme=scheme)
 
     def _simulate_subordinator(self, dt: float, n_paths: int) -> np.ndarray:
         """

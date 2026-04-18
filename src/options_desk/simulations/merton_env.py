@@ -154,6 +154,7 @@ class MertonEnv(gym.Env if gym else object):
                     shape=(self.n_instruments,),
                     dtype=np.float32
                 ),
+                'action_mask': spaces.MultiBinary(self.n_instruments),
             })
         else:
             self.option_feature_dim = 0
@@ -167,6 +168,7 @@ class MertonEnv(gym.Env if gym else object):
                     shape=(1,),
                     dtype=np.float32,
                 ),
+                'action_mask': spaces.MultiBinary(self.n_instruments),
             })
 
         self.path = None
@@ -177,6 +179,7 @@ class MertonEnv(gym.Env if gym else object):
         self.portfolio_value = None
         self.current_option_chain = None
         self.option_grid_prices = None
+        self.action_mask = np.ones(self.n_instruments, dtype=bool)
         self.liability_mtm = None
         self.hedge_portfolio_value = None
 
@@ -211,6 +214,8 @@ class MertonEnv(gym.Env if gym else object):
 
         if self.include_options:
             self._generate_option_chain()
+            self.action_mask = self._build_action_mask()
+            self._apply_action_mask_to_option_prices()
 
         if self.liability is not None:
             self._price_liability()
@@ -232,8 +237,10 @@ class MertonEnv(gym.Env if gym else object):
             raise ValueError(f"Action must have shape ({self.n_instruments},), got {action.shape}")
 
         action = np.clip(action, -self.position_limits, self.position_limits)
+        action = np.where(self.action_mask, action, 0.0).astype(np.float32)
         old_positions = self.positions.copy()
         position_changes = action - old_positions
+        previous_action_mask = self.action_mask.copy()
 
         transaction_cost = self._compute_transaction_cost(position_changes)
         self.positions = action
@@ -250,6 +257,10 @@ class MertonEnv(gym.Env if gym else object):
             self.S = float(self.path[self.t])
             if self.include_options:
                 self._generate_option_chain()
+                self.action_mask = self._build_action_mask()
+                settlement_pnl = self._settle_unavailable_options(previous_action_mask)
+                self.cash += settlement_pnl
+                self._apply_action_mask_to_option_prices()
 
         old_portfolio_value = self.portfolio_value
         self.portfolio_value = self.cash + self.positions[0] * self.S
@@ -273,6 +284,7 @@ class MertonEnv(gym.Env if gym else object):
                 'option_features': option_features,
                 'time_step': np.array([self.t], dtype=np.float32),
                 'portfolio_weights': portfolio_weights.astype(np.float32),
+                'action_mask': self.action_mask.copy(),
             }
 
         return {
@@ -280,6 +292,7 @@ class MertonEnv(gym.Env if gym else object):
             'time_step': np.array([self.t], dtype=np.float32),
             'portfolio_value': np.array([self.portfolio_value], dtype=np.float32),
             'position': np.array([self.positions[0]], dtype=np.float32),
+            'action_mask': self.action_mask.copy(),
         }
 
     def _get_info(self) -> Dict[str, Any]:
@@ -290,6 +303,7 @@ class MertonEnv(gym.Env if gym else object):
             'positions': self.positions.copy(),
             'portfolio_value': self.portfolio_value,
             'n_instruments': self.n_instruments,
+            'action_mask': self.action_mask.copy(),
             'option_chain': self.current_option_chain,
             'option_grid_prices': self.option_grid_prices,
             'liability_mtm': self.liability_mtm,
@@ -319,6 +333,26 @@ class MertonEnv(gym.Env if gym else object):
             vol_profile=vol_profile,
         )
         self.option_grid_prices = self._extract_grid_prices()
+
+    def _build_action_mask(self) -> np.ndarray:
+        """Build the floating-grid availability mask for the current step."""
+        remaining_steps = max(self.max_steps - self.t, 0)
+        mask = [True]
+        for ttm in sorted(self.option_grid.keys()):
+            available = ttm <= remaining_steps
+            for _ in self.option_grid[ttm]:
+                mask.extend([available, available])
+        return np.asarray(mask, dtype=bool)
+
+    def _apply_action_mask_to_option_prices(self) -> None:
+        """Zero out non-tradable option slots in the public grid-price view."""
+        if self.option_grid_prices is None:
+            return
+        self.option_grid_prices = np.where(
+            self.action_mask[1:],
+            self.option_grid_prices,
+            0.0,
+        ).astype(np.float32)
 
     def _extract_grid_prices(self) -> np.ndarray:
         if self.current_option_chain is None:
@@ -376,7 +410,9 @@ class MertonEnv(gym.Env if gym else object):
                     features.extend([opt.mid / (self.S + 1e-8), opt.implied_volatility or 0.0])
                 else:
                     features.extend([0.0, 0.0])
-        return np.array(features, dtype=np.float32)
+        feature_array = np.array(features, dtype=np.float32)
+        option_feature_mask = np.repeat(self.action_mask[1:], 2)
+        return np.where(option_feature_mask, feature_array, 0.0).astype(np.float32)
 
     def _compute_transaction_cost(self, position_changes: np.ndarray) -> float:
         total_cost = 0.0
@@ -388,6 +424,29 @@ class MertonEnv(gym.Env if gym else object):
             option_cost = np.sum(option_changes * self.option_grid_prices) * self.transaction_cost_pct
             total_cost += option_cost
         return float(total_cost)
+
+    def _settle_unavailable_options(self, previous_action_mask: np.ndarray) -> float:
+        """
+        Liquidate positions whose grid buckets are no longer tradable.
+
+        This preserves the fixed Gym action shape while enforcing floating-grid
+        semantics through a changing availability mask.
+        """
+        if not self.include_options or self.option_grid_prices is None:
+            return 0.0
+
+        newly_unavailable = previous_action_mask[1:] & ~self.action_mask[1:]
+        if not np.any(newly_unavailable):
+            return 0.0
+
+        settlement = float(
+            np.dot(
+                self.positions[1:][newly_unavailable],
+                self.option_grid_prices[newly_unavailable],
+            )
+        )
+        self.positions[1:][newly_unavailable] = 0.0
+        return settlement
 
     def _price_liability(self):
         if self.liability is None or self.current_option_chain is None:

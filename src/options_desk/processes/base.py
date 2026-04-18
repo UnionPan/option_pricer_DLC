@@ -9,10 +9,19 @@ email: yp1170@nyu.edu
 
 from abc import ABC, abstractmethod
 import numpy as np
-from typing import Optional, Tuple, Callable
+import warnings
+from typing import Optional, Tuple, Callable, Dict, Any
 from dataclasses import dataclass
 
-@dataclass
+from ._jax_backend import should_fallback_to_numpy
+
+try:
+    from . import _jax_kernels
+    _JAX_AVAILABLE = True
+except Exception:
+    _JAX_AVAILABLE = False
+
+@dataclass(frozen=True)
 class SimulationConfig:
     """configs for Monte-Carlo"""
     n_paths: int = 10000
@@ -20,8 +29,30 @@ class SimulationConfig:
     random_seed: Optional[int] = None
     antithetic: bool = False
     use_sobol: bool = False
-    return_full_paths: bool = False
+    return_full_paths: bool = True
     batch_size: Optional[int] = None 
+
+
+def validate_simulation_config(config: SimulationConfig) -> None:
+    """Reject simulation settings that are currently unsafe or unsupported."""
+    if config.antithetic and config.n_paths % 2 != 0:
+        raise ValueError("SimulationConfig.n_paths must be even when antithetic=True.")
+
+    if config.use_sobol:
+        raise NotImplementedError(
+            "SimulationConfig.use_sobol=True is not implemented for processes.simulate yet."
+        )
+
+    if config.batch_size is not None:
+        raise NotImplementedError(
+            "SimulationConfig.batch_size is not implemented for processes.simulate yet."
+        )
+
+    if not config.return_full_paths:
+        raise NotImplementedError(
+            "SimulationConfig.return_full_paths=False is not implemented; "
+            "processes.simulate always returns full paths."
+        )
 
 
 class StochasticProcess(ABC):
@@ -110,9 +141,26 @@ class StochasticProcess(ABC):
             # Matrix-valued: vectorized sigma[i] @ dW[i]
             return np.einsum('ijk,ik->ij', sigma, dW)
 
+    def _build_jax_spec(self) -> Optional[Dict[str, Any]]:
+        """
+        Return JAX functional specification for this process, or None.
+
+        Override in subclasses to enable JAX-accelerated simulation.
+        When this returns a non-None dict, simulate() delegates to
+        _jax_kernels.simulate() instead of the NumPy loop.
+
+        Returns:
+            Dict with required keys:
+                drift_fn, diffusion_fn, params, dim
+            Optional keys:
+                cholesky, jump_fn, post_step_fn, diffusion_deriv_fn
+            Or None to use the NumPy path.
+        """
+        return None
+
     def simulate(
         self,
-        X0: np.ndarray, 
+        X0: np.ndarray,
         T: float,
         config: SimulationConfig,
         scheme: str = "euler"
@@ -121,15 +169,57 @@ class StochasticProcess(ABC):
         X0: initial value
         T: Time horizon
         config: Simulation configuration
-        scheme: Numerical scheme ('euler', 'milstein', 'exact') 
+        scheme: Numerical scheme ('euler', 'milstein', 'exact')
 
         returns:
-            Tuple of (time_grid, paths) paths shape: (n_steps, n_paths)
+            Tuple of (time_grid, paths) where paths has shape
+            (n_steps+1, n_paths, dim). Terminal-only output is not supported.
         """
-        
+        validate_simulation_config(config)
+
+        # --- JAX fast path ---
+        if (
+            _JAX_AVAILABLE
+            and scheme.lower() in ("euler", "milstein")
+            and not config.use_sobol
+        ):
+            spec = self._build_jax_spec()
+            if spec is not None:
+                seed = config.random_seed if config.random_seed is not None else 0
+                try:
+                    return _jax_kernels.simulate(
+                        drift_fn=spec['drift_fn'],
+                        diffusion_fn=spec['diffusion_fn'],
+                        params=spec['params'],
+                        X0=X0,
+                        T=T,
+                        n_paths=config.n_paths,
+                        n_steps=config.n_steps,
+                        seed=seed,
+                        scheme=scheme.lower(),
+                        antithetic=config.antithetic,
+                        dim=spec['dim'],
+                        cholesky=spec.get('cholesky'),
+                        jump_fn=spec.get('jump_fn'),
+                        post_step_fn=spec.get('post_step_fn'),
+                        diffusion_deriv_fn=spec.get('diffusion_deriv_fn'),
+                    )
+                except Exception as exc:
+                    if not should_fallback_to_numpy(exc):
+                        raise
+                    warnings.warn(
+                        (
+                            f"JAX backend initialization failed for {self.name}; "
+                            "falling back to NumPy simulation."
+                        ),
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+
+        # --- NumPy fallback ---
         if config.random_seed is not None:
             np.random.seed(config.random_seed)
-        
+
         dt = T/config.n_steps
         t_grid = np.linspace(0, T, config.n_steps+1)
 

@@ -1,64 +1,80 @@
 .magnificent7-card {
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px var(--card-shadow);
+  background: var(--panel-bg);
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+}
+
+.magnificent7-card > .section-title {
+  background: linear-gradient(90deg, #2d1854, #5a2d82);
 }
 
 .magnificent7-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: 0.375rem;
+  padding: 0.5rem;
+  margin: 0.375rem;
+  background: var(--well-bg);
+  border: 2px solid;
+  border-color: var(--well-border-top) var(--well-border-right) var(--well-border-bottom) var(--well-border-left);
 }
 
 .stock-item {
-  background: var(--bg-primary);
-  border-radius: 6px;
-  padding: 1rem;
+  background: var(--panel-bg-alt);
+  padding: 0.625rem;
   border: 1px solid var(--border-color);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: background 0.1s;
 }
 
 .stock-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px var(--card-shadow);
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .stock-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.125rem;
 }
 
 .stock-symbol {
   font-weight: 700;
-  font-size: 1rem;
-  color: var(--text-primary);
-  font-family: 'Courier New', monospace;
+  font-size: 0.8125rem;
+  color: var(--accent);
+  font-family: 'IBM Plex Mono', 'Lucida Console', monospace;
 }
 
 .stock-change {
-  font-size: 0.85rem;
+  font-size: 0.6875rem;
   font-weight: 600;
+  font-family: 'IBM Plex Mono', 'Lucida Console', monospace;
+  padding: 0 0.25rem;
+  border: 1px solid;
 }
 
 .stock-change.positive {
   color: var(--positive-color);
+  border-color: var(--positive-color);
+  background: var(--positive-soft);
 }
 
 .stock-change.negative {
   color: var(--negative-color);
+  border-color: var(--negative-color);
+  background: var(--negative-soft);
 }
 
 .stock-name {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-bottom: 0.375rem;
 }
 
 .stock-price {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
+  font-family: 'IBM Plex Mono', 'Lucida Console', monospace;
+  letter-spacing: -0.02em;
 }

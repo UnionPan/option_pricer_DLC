@@ -1,0 +1,4 @@
+-r requirements-base.txt
+
+# JAX with NVIDIA CUDA backend on Linux
+jax[cuda13]>=0.9.0,<0.10

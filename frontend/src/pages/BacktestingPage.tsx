@@ -218,14 +218,13 @@ const BacktestingPage: React.FC = () => {
       <div className="backtesting-layout">
         {/* Configuration Panel - Horizontal Layout */}
         <div className="config-panel">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+          <div className="config-sections-grid">
             {/* Model Selection - Top Left */}
-            <div className="config-section" style={{ margin: 0 }}>
-              <h3 style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>Model</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="config-section">
+              <h3>Model</h3>
+              <div className="config-column-stack">
                 <select
                   className="model-select"
-                  style={{ width: '100%' }}
                   value={calibrationResult ? 'custom' : ''}
                   onChange={(e) => {
                     if (e.target.value === 'custom') return;
@@ -244,18 +243,18 @@ const BacktestingPage: React.FC = () => {
                   {calibrationResult && <option value="custom">Custom: {calibrationResult.ticker}</option>}
                 </select>
                 <div className="file-upload">
-                  <label className="upload-label" style={{ fontSize: '0.75rem' }}>
+                  <label className="upload-label">
                     <input
                       type="file"
                       accept=".json"
                       onChange={handleFileUpload}
                       style={{ display: 'none' }}
                     />
-                    <span className="upload-btn" style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}>Upload JSON</span>
+                    <span className="upload-btn">Upload JSON</span>
                   </label>
                 </div>
                 {calibrationResult && (
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  <div className="config-meta">
                     {calibrationResult.model.toUpperCase()} • {calibrationResult.ticker}
                   </div>
                 )}
@@ -263,25 +262,24 @@ const BacktestingPage: React.FC = () => {
             </div>
 
             {/* Liability Specification - Middle */}
-            <div className="config-section" style={{ margin: 0 }}>
-              <h3 style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>Liability</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div className="config-section">
+              <h3>Liability</h3>
+              <div className="config-grid">
                 <div className="config-field">
-                  <label style={{ fontSize: '0.75rem' }}>Type</label>
+                  <label>Type</label>
                   <select
                     value={liabilityConfig.optionType}
                     onChange={(e) => setLiabilityConfig({
                       ...liabilityConfig,
                       optionType: e.target.value as 'call' | 'put'
                     })}
-                    style={{ fontSize: '0.875rem' }}
                   >
                     <option value="call">Call</option>
                     <option value="put">Put</option>
                   </select>
                 </div>
                 <div className="config-field">
-                  <label style={{ fontSize: '0.75rem' }}>Strike</label>
+                  <label>Strike</label>
                   <input
                     type="number"
                     value={liabilityConfig.strike}
@@ -289,11 +287,10 @@ const BacktestingPage: React.FC = () => {
                       ...liabilityConfig,
                       strike: parseFloat(e.target.value)
                     })}
-                    style={{ fontSize: '0.875rem' }}
                   />
                 </div>
                 <div className="config-field">
-                  <label style={{ fontSize: '0.75rem' }}>Maturity (d)</label>
+                  <label>Maturity (d)</label>
                   <input
                     type="number"
                     value={liabilityConfig.maturityDays}
@@ -301,11 +298,10 @@ const BacktestingPage: React.FC = () => {
                       ...liabilityConfig,
                       maturityDays: parseInt(e.target.value)
                     })}
-                    style={{ fontSize: '0.875rem' }}
                   />
                 </div>
                 <div className="config-field">
-                  <label style={{ fontSize: '0.75rem' }}>Quantity</label>
+                  <label>Quantity</label>
                   <input
                     type="number"
                     step="0.1"
@@ -314,16 +310,15 @@ const BacktestingPage: React.FC = () => {
                       ...liabilityConfig,
                       quantity: parseFloat(e.target.value)
                     })}
-                    style={{ fontSize: '0.875rem' }}
                   />
                 </div>
               </div>
             </div>
 
             {/* Hedging Strategy - Right */}
-            <div className="config-section" style={{ margin: 0 }}>
-              <h3 style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>Strategy</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="config-section">
+              <h3>Strategy</h3>
+              <div className="config-column-stack">
                 {[
                   { value: 'delta_hedge', label: 'Delta' },
                   { value: 'delta_gamma_hedge', label: 'Δ-Γ' },
@@ -332,20 +327,7 @@ const BacktestingPage: React.FC = () => {
                 ].map((strategy) => (
                   <label
                     key={strategy.value}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem',
-                      border: '2px solid var(--border-color)',
-                      borderRadius: '0.25rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: hedgingStrategy === strategy.value ? 600 : 500,
-                      backgroundColor: hedgingStrategy === strategy.value ? 'rgba(37, 99, 235, 0.15)' : 'transparent',
-                      borderColor: hedgingStrategy === strategy.value ? 'var(--accent)' : 'var(--border-color)',
-                      color: hedgingStrategy === strategy.value ? 'var(--accent)' : 'var(--text-primary)',
-                    }}
+                    className={`strategy-radio-label ${hedgingStrategy === strategy.value ? 'selected' : ''}`}
                   >
                     <input
                       type="radio"
@@ -353,28 +335,26 @@ const BacktestingPage: React.FC = () => {
                       value={strategy.value}
                       checked={hedgingStrategy === strategy.value}
                       onChange={(e) => setHedgingStrategy(e.target.value)}
-                      style={{ margin: 0 }}
                     />
                     <span>{strategy.label}</span>
                   </label>
                 ))}
               </div>
               {requiredHedgeLegs > 0 && (
-                <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <div className="hedge-options-section">
+                  <div className="hedge-options-title">
                     Hedge Options
                   </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                  <label className="hedge-sync-label">
                     <input
                       type="checkbox"
                       checked={syncHedgeToLiability}
                       onChange={(e) => setSyncHedgeToLiability(e.target.checked)}
-                      style={{ width: 'auto', margin: 0 }}
                     />
                     <span>Sync to liability</span>
                   </label>
                   {hedgeOptions.slice(0, requiredHedgeLegs).map((opt, idx) => (
-                    <div key={`hedge-${idx}`} style={{ display: 'grid', gridTemplateColumns: '0.9fr 1fr 1fr', gap: '0.4rem' }}>
+                    <div key={`hedge-${idx}`} className="hedge-leg-row">
                       <select
                         value={opt.option_type}
                         onChange={(e) => {
@@ -383,7 +363,6 @@ const BacktestingPage: React.FC = () => {
                           setHedgeOptions(next);
                           setSyncHedgeToLiability(false);
                         }}
-                        style={{ fontSize: '0.8rem' }}
                       >
                         <option value="call">Call</option>
                         <option value="put">Put</option>
@@ -397,7 +376,6 @@ const BacktestingPage: React.FC = () => {
                           setHedgeOptions(next);
                           setSyncHedgeToLiability(false);
                         }}
-                        style={{ fontSize: '0.8rem' }}
                         placeholder="Strike"
                       />
                       <input
@@ -409,7 +387,6 @@ const BacktestingPage: React.FC = () => {
                           setHedgeOptions(next);
                           setSyncHedgeToLiability(false);
                         }}
-                        style={{ fontSize: '0.8rem' }}
                         placeholder="Days"
                       />
                     </div>
@@ -419,11 +396,11 @@ const BacktestingPage: React.FC = () => {
             </div>
 
             {/* Simulation Parameters - Top Right */}
-            <div className="config-section" style={{ margin: 0 }}>
-              <h3 style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>Simulation</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div className="config-section">
+              <h3>Simulation</h3>
+              <div className="config-grid">
                 <div className="config-field">
-                  <label style={{ fontSize: '0.75rem' }}>S0</label>
+                  <label>S0</label>
                   <input
                     type="number"
                     value={simulationConfig.s0}
@@ -431,11 +408,10 @@ const BacktestingPage: React.FC = () => {
                       ...simulationConfig,
                       s0: parseFloat(e.target.value)
                     })}
-                    style={{ fontSize: '0.875rem' }}
                   />
                 </div>
                 <div className="config-field">
-                  <label style={{ fontSize: '0.75rem' }}>Steps</label>
+                  <label>Steps</label>
                   <input
                     type="number"
                     value={simulationConfig.nSteps}
@@ -443,11 +419,10 @@ const BacktestingPage: React.FC = () => {
                       ...simulationConfig,
                       nSteps: parseInt(e.target.value)
                     })}
-                    style={{ fontSize: '0.875rem' }}
                   />
                 </div>
                 <div className="config-field">
-                  <label style={{ fontSize: '0.75rem' }}>Paths</label>
+                  <label>Paths</label>
                   <input
                     type="number"
                     value={fullVisualization ? 1 : simulationConfig.nPaths}
@@ -456,11 +431,11 @@ const BacktestingPage: React.FC = () => {
                       nPaths: parseInt(e.target.value)
                     })}
                     disabled={fullVisualization}
-                    style={{ fontSize: '0.875rem', opacity: fullVisualization ? 0.6 : 1 }}
+                    style={{ opacity: fullVisualization ? 0.6 : 1 }}
                   />
                 </div>
                 <div className="config-field">
-                  <label style={{ fontSize: '0.75rem' }}>TC (bps)</label>
+                  <label>TC (bps)</label>
                   <input
                     type="number"
                     step="0.1"
@@ -469,17 +444,15 @@ const BacktestingPage: React.FC = () => {
                       ...simulationConfig,
                       transactionCostBps: parseFloat(e.target.value)
                     })}
-                    style={{ fontSize: '0.875rem' }}
                   />
                 </div>
               </div>
               {calibrationResult?.model?.toLowerCase().includes('heston') && (
                 <div className="config-field" style={{ marginTop: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem' }}>Heston Pricer</label>
+                  <label>Heston Pricer</label>
                   <select
                     value={hestonPricer}
                     onChange={(e) => setHestonPricer(e.target.value as 'mgf' | 'analytical')}
-                    style={{ fontSize: '0.875rem' }}
                   >
                     <option value="mgf">MGF (fast)</option>
                     <option value="analytical">Analytical (slow)</option>
@@ -487,16 +460,15 @@ const BacktestingPage: React.FC = () => {
                 </div>
               )}
               <div className="config-field" style={{ marginTop: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.75rem' }}>
+                <label className="config-checkbox-label">
                   <input
                     type="checkbox"
                     checked={fullVisualization}
                     onChange={(e) => setFullVisualization(e.target.checked)}
-                    style={{ width: 'auto', margin: 0 }}
                   />
                   <span>Single path mode</span>
                 </label>
-                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.25rem', marginLeft: '1.25rem' }}>
+                <p className="config-checkbox-hint">
                   {fullVisualization
                     ? '1 path with IV surface visualization'
                     : 'Multi-path for summary statistics'}
@@ -547,9 +519,9 @@ const BacktestingPage: React.FC = () => {
 
             {/* Charts Layout */}
             {fullVisualization && animatedData && (
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div className="charts-flex-row">
                 {/* Left: Vertical Stack of Main Charts (only in single-path mode) */}
-                <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="charts-main-column">
                   {/* Chart 1: Price + Volatility (dual y-axis) */}
                   <div className="chart-container">
                     <Plot
@@ -684,16 +656,11 @@ const BacktestingPage: React.FC = () => {
 
                 {/* Right: IV Surface + Vol Smile (only in single-path mode) */}
                 {fullVisualization && (
-                <div style={{ width: '550px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="charts-side-column">
 
                   {/* Debug message if option chains not available */}
                   {(!backtestResult.option_chains || backtestResult.option_chains.length === 0) && (
-                    <div style={{
-                      padding: '2rem',
-                      textAlign: 'center',
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.875rem'
-                    }}>
+                    <div className="charts-side-placeholder">
                       Loading option chain visualization...
                       {backtestResult.option_chains === undefined && ' (chains undefined)'}
                       {backtestResult.option_chains != null && backtestResult.option_chains.length === 0 && ' (chains empty)'}
@@ -758,8 +725,8 @@ const BacktestingPage: React.FC = () => {
                                   highlightcolor: "#42f462",
                                   project: { z: true }
                                 }
-                              },
-                            } as any,
+                              } as any,
+                            },
                           ]}
                           layout={{
                             title: { text: `IV Surface (t=${currentStep})`, font: { size: 12 } },
@@ -850,19 +817,11 @@ const BacktestingPage: React.FC = () => {
 
             {/* Multi-Path Mode View */}
             {!fullVisualization && backtestResult && (
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                <div style={{ width: '600px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="multipath-layout">
+                <div className="multipath-content">
                   {/* Summary Statistics */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(2, 1fr)',
-                    gap: '0.75rem',
-                    padding: '1.5rem',
-                    backgroundColor: 'var(--card-bg)',
-                    borderRadius: '0.5rem',
-                    border: '1px solid var(--border-color)',
-                  }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem', marginBottom: '0.5rem', gridColumn: '1 / -1' }}>
+                  <div className="multipath-summary">
+                    <h4>
                       Summary Statistics ({backtestResult.summary_stats.num_rebalances} rebalances)
                     </h4>
                     {[
@@ -875,9 +834,9 @@ const BacktestingPage: React.FC = () => {
                       { label: 'VaR (95%)', value: `$${backtestResult.summary_stats.var_95.toFixed(2)}` },
                       { label: 'CVaR (95%)', value: `$${backtestResult.summary_stats.cvar_95.toFixed(2)}` },
                     ].map((stat, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', padding: '0.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '0.25rem' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>{stat.label}:</span>
-                        <span style={{ fontWeight: '500' }}>{stat.value}</span>
+                      <div key={idx} className="multipath-stat-row">
+                        <span className="stat-row-label">{stat.label}:</span>
+                        <span className="stat-row-value">{stat.value}</span>
                       </div>
                     ))}
                   </div>

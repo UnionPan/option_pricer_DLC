@@ -24,7 +24,11 @@ from scipy.integrate import quad
 import warnings
 
 from .data_provider import OptionChain, OptionQuote
-from options_desk.pricer.heston_mgf_pricer import heston_price_vanilla, heston_price_slice
+try:
+    from options_desk.pricer._jax_mgf_pricer import heston_price_slice_fast as heston_price_slice
+    from options_desk.pricer.heston_mgf_pricer import heston_price_vanilla
+except ImportError:
+    from options_desk.pricer.heston_mgf_pricer import heston_price_vanilla, heston_price_slice
 
 
 def get_default_moneyness_by_maturity() -> Dict[int, List[float]]:
@@ -120,6 +124,7 @@ class SyntheticEquityOptionChainGenerator:
         price_floor: float = 0.0001,  # Very low floor to not interfere with smile
         enforce_intrinsic: bool = True,
         random_seed: Optional[int] = None,
+        days_per_year: float = 365.0,
     ):
         """
         Initialize equity option chain generator.
@@ -136,6 +141,8 @@ class SyntheticEquityOptionChainGenerator:
             price_floor: Absolute minimum price
             enforce_intrinsic: Ensure price >= max(intrinsic, floor)
             random_seed: For reproducibility
+            days_per_year: Convention for converting days to year fractions.
+                365.0 for calendar days (default), 252.0 for trading days.
         """
         self.risk_free_rate = risk_free_rate
         self.dividend_yield = dividend_yield
@@ -179,6 +186,7 @@ class SyntheticEquityOptionChainGenerator:
         self.price_floor = price_floor
         self.enforce_intrinsic = enforce_intrinsic
 
+        self.days_per_year = days_per_year
         self._rng = np.random.RandomState(random_seed)
 
     def generate_single_chain(
@@ -202,7 +210,7 @@ class SyntheticEquityOptionChainGenerator:
 
         for maturity_days in self.maturities_days:
             expiry = reference_date + timedelta(days=maturity_days)
-            T = maturity_days / 365.0
+            T = maturity_days / self.days_per_year
 
             # Prepare all strikes and option types for this maturity
             # Use maturity-specific moneyness grid (adaptive)
@@ -236,28 +244,43 @@ class SyntheticEquityOptionChainGenerator:
                 option_types=types_array
             )
 
+            # Add noise (optional)
+            if self.add_noise:
+                noise = self._rng.normal(0, self.noise_level, len(prices_mid))
+                scales = np.maximum(prices_mid, 1.0)
+                prices_mid = np.maximum(prices_mid + noise * scales, self.price_floor)
+
+            # Batch IV inversion (all options at this maturity in one JAX call)
+            try:
+                from options_desk.pricer._jax_iv import implied_vol_batch_np
+                is_call_array = np.array([t == 'call' for t in types_maturity])
+                ivs_batch = implied_vol_batch_np(
+                    S=spot_price,
+                    K=np.array(strikes_maturity),
+                    T=T,
+                    r=self.risk_free_rate,
+                    q=self.dividend_yield,
+                    market_prices=prices_mid,
+                    is_call=is_call_array,
+                    sigma_init=np.full(len(strikes_maturity), vol_profile.atm_iv),
+                    sigma_min=vol_profile.min_iv,
+                    sigma_max=vol_profile.max_iv,
+                )
+            except ImportError:
+                # Fallback to per-option IV if JAX not available
+                ivs_batch = np.array([
+                    self._black_scholes_iv(
+                        spot_price, strike, T, self.risk_free_rate, self.dividend_yield,
+                        price, opt_type == 'call', vol_profile,
+                    )
+                    for strike, opt_type, price in zip(strikes_maturity, types_maturity, prices_mid)
+                ])
+
             # Process each option
             for i, (strike, opt_type, moneyness, price_mid) in enumerate(
                 zip(strikes_maturity, types_maturity, moneyness_maturity, prices_mid)
             ):
-                is_call = (opt_type == 'call')
-
-                # Add noise (optional)
-                if self.add_noise:
-                    noise = self._rng.normal(0, self.noise_level * max(price_mid, 1.0))
-                    price_mid = max(price_mid + noise, self.price_floor)
-
-                # Back out IV
-                iv = self._black_scholes_iv(
-                    S=spot_price,
-                    K=strike,
-                    T=T,
-                    r=self.risk_free_rate,
-                    q=self.dividend_yield,
-                    price=price_mid,
-                    is_call=is_call,
-                    vol_profile=vol_profile,
-                )
+                iv = float(ivs_batch[i])
 
                 # Bid/ask spread
                 spread = self._compute_bid_ask_spread(price_mid, moneyness, T)

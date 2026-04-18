@@ -4,11 +4,10 @@ Monte Carlo pricing engine for derivatives
 author: Yunian Pan
 email: yp1170@nyu.edu
 """
+import copy
 import numpy as np
 import time
 from typing import Optional, Union
-import sys
-sys.path.insert(0, '../')
 
 from .base import Pricer, PricingResult
 from options_desk.derivatives.base import PathIndependentDerivative, PathDependentDerivative
@@ -70,28 +69,23 @@ class MonteCarloPricer(Pricer):
 
         # Use default config if not provided
         if config is None:
-            from processes.base import SimulationConfig
+            from options_desk.processes.base import SimulationConfig
             config = SimulationConfig(n_paths=10000, n_steps=252)
 
         # If the process exposes a drift parameter, align it to the risk-neutral drift (r - q)
-        mu_original = None
-        mu_adjusted = False
+        # Use a shallow copy so the caller's process object is never mutated.
+        sim_process = process
         if hasattr(process, "mu"):
-            mu_original = process.mu
+            sim_process = copy.copy(process)
             target_mu = self.risk_free_rate - self.dividend_yield
-            process.mu = (
+            sim_process.mu = (
                 float(target_mu)
-                if np.ndim(mu_original) == 0
-                else np.full_like(mu_original, target_mu, dtype=float)
+                if np.ndim(process.mu) == 0
+                else np.full_like(process.mu, target_mu, dtype=float)
             )
-            mu_adjusted = True
 
-        try:
-            # Simulate process
-            t_grid, paths = process.simulate(X0_array, derivative.maturity, config, scheme)
-        finally:
-            if mu_adjusted:
-                process.mu = mu_original
+        # Simulate process
+        t_grid, paths = sim_process.simulate(X0_array, derivative.maturity, config, scheme)
 
         # Calculate payoffs
         if isinstance(derivative, PathIndependentDerivative):
@@ -197,31 +191,27 @@ class MonteCarloPricer(Pricer):
 
         # Vega: dV/dσ (derivative w.r.t. volatility) - only for processes with sigma
         if hasattr(process, 'sigma'):
-            sigma_original = process.sigma
-            process.sigma = sigma_original * (1 + bump)
-            result_vega = self.price(derivative, process, X0, config, scheme, compute_greeks=False)
-            greeks['vega'] = (result_vega.price - base_price) / (sigma_original * bump)
-            process.sigma = sigma_original  # Restore
+            bumped_process = copy.copy(process)
+            bumped_process.sigma = process.sigma * (1 + bump)
+            result_vega = self.price(derivative, bumped_process, X0, config, scheme, compute_greeks=False)
+            greeks['vega'] = (result_vega.price - base_price) / (process.sigma * bump)
 
         # Theta: -dV/dt (derivative w.r.t. time to maturity)
-        # Approximate by shifting maturity
         maturity_original = derivative.maturity
         if maturity_original > 0:
-            # Use the smaller of 1 day or half the remaining maturity to avoid negative/zero T
             dt = min(1.0 / 365.0, maturity_original * 0.5)
-            derivative.maturity = max(maturity_original - dt, 0.0)
-            result_theta = self.price(derivative, process, X0, config, scheme, compute_greeks=False)
+            bumped_derivative = copy.copy(derivative)
+            bumped_derivative.maturity = max(maturity_original - dt, 0.0)
+            result_theta = self.price(bumped_derivative, process, X0, config, scheme, compute_greeks=False)
             greeks['theta'] = -(result_theta.price - base_price) / dt
-            derivative.maturity = maturity_original  # Restore
         else:
             greeks['theta'] = 0.0
 
         # Rho: dV/dr (derivative w.r.t. risk-free rate)
-        r_original = self.risk_free_rate
-        self.risk_free_rate = r_original + 0.01  # 1% bump
-        result_rho = self.price(derivative, process, X0, config, scheme, compute_greeks=False)
+        bumped_pricer = copy.copy(self)
+        bumped_pricer.risk_free_rate = self.risk_free_rate + 0.01
+        result_rho = bumped_pricer.price(derivative, process, X0, config, scheme, compute_greeks=False)
         greeks['rho'] = (result_rho.price - base_price) / 0.01
-        self.risk_free_rate = r_original  # Restore
 
         return greeks
 
@@ -248,7 +238,7 @@ class MonteCarloPricer(Pricer):
         Returns:
             Dictionary with convergence statistics
         """
-        from processes.base import SimulationConfig
+        from options_desk.processes.base import SimulationConfig
 
         if path_counts is None:
             path_counts = [1000, 5000, 10000, 50000, 100000]
@@ -299,7 +289,7 @@ class MonteCarloPricer(Pricer):
         X0_array = np.atleast_1d(np.array(X0, dtype=float))
 
         if config is None:
-            from processes.base import SimulationConfig
+            from options_desk.processes.base import SimulationConfig
             config = SimulationConfig(n_paths=10000, n_steps=252)
 
         # Simulate process once for both derivatives

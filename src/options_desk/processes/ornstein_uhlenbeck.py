@@ -64,6 +64,15 @@ class OrnsteinUhlenbeck(DriftDiffusionProcess):
         self.half_life = np.log(2) / self.theta
         self.params['half_life'] = self.half_life
 
+    def _build_jax_spec(self):
+        from ._process_defs import OUParams, ou_drift, ou_diffusion
+        return {
+            'drift_fn': ou_drift,
+            'diffusion_fn': ou_diffusion,
+            'params': OUParams(theta=self.theta, mu=self.mu, sigma=self.sigma),
+            'dim': 1,
+        }
+
     def drift(self, X: np.ndarray, t: float) -> np.ndarray:
         """
         Drift term: theta * (mu - X_t)

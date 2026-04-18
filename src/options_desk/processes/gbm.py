@@ -34,6 +34,16 @@ class GBM(DriftDiffusionProcess):
         self.params['mu'] = self.mu
         self.params['sigma'] = self.sigma
 
+    def _build_jax_spec(self):
+        from ._process_defs import GBMParams, gbm_drift, gbm_diffusion, gbm_diffusion_deriv
+        return {
+            'drift_fn': gbm_drift,
+            'diffusion_fn': gbm_diffusion,
+            'params': GBMParams(mu=self.mu, sigma=self.sigma),
+            'dim': 1,
+            'diffusion_deriv_fn': gbm_diffusion_deriv,
+        }
+
     def drift(self, X: np.ndarray, t: float) -> np.ndarray:
         """
         Drift term: mu * S_t

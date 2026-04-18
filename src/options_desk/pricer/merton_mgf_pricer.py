@@ -18,19 +18,24 @@ def compute_merton_mgf_grid(
     phi_grid: np.ndarray,
 ) -> np.ndarray:
     """
-    Compute log-MGF for log-forward returns under Merton model.
+    Compute log-MGF for log-forward returns under Merton model (Sepp convention).
 
-    X = log(S_T / F_T) follows diffusion + compound Poisson.
+    Sepp convention: MGF of -log(S_T/F), so b0 = 0.5*phi*(phi+1)
+    and jump uses exp(-phi*mu_J) with +k*phi compensator.
     """
     if ttm <= 0:
         return np.zeros_like(phi_grid, dtype=np.complex128)
 
     kappa = np.exp(mu_J + 0.5 * sigma_J**2) - 1.0
-    drift = -0.5 * sigma**2 * ttm - lambda_jump * kappa * ttm
-    diffusion = 0.5 * sigma**2 * ttm * phi_grid * phi_grid
-    jump = lambda_jump * ttm * (np.exp(phi_grid * mu_J + 0.5 * sigma_J**2 * phi_grid**2) - 1.0)
+    # Diffusion: Sepp convention 0.5*sigma^2*T*phi*(phi+1)
+    diffusion = 0.5 * sigma**2 * ttm * phi_grid * (phi_grid + 1.0)
+    # Jump: Sepp convention (phi -> -phi of standard)
+    jump = lambda_jump * ttm * (
+        np.exp(-phi_grid * mu_J + 0.5 * sigma_J**2 * phi_grid**2) - 1.0
+        + kappa * phi_grid
+    )
 
-    log_mgf = phi_grid * drift + diffusion + jump
+    log_mgf = diffusion + jump
     return log_mgf
 
 

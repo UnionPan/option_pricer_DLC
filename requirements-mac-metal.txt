@@ -1,0 +1,6 @@
+-r requirements-base.txt
+
+# JAX with Apple Silicon Metal backend
+jax>=0.9.0,<0.10
+jaxlib>=0.9.0,<0.10
+jax-metallib==0.9.4.5

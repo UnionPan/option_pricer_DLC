@@ -75,6 +75,20 @@ class SABR(MultiFactorProcess):
         self.params['rho'] = self.rho
         self.params['sigma0'] = self.sigma0
 
+    def _build_jax_spec(self):
+        from ._process_defs import (
+            SABRParams, sabr_drift, sabr_diffusion,
+            sabr_post_step, heston_cholesky,
+        )
+        return {
+            'drift_fn': sabr_drift,
+            'diffusion_fn': sabr_diffusion,
+            'params': SABRParams(beta=self.beta, alpha=self.alpha, rho=self.rho),
+            'dim': 2,
+            'cholesky': heston_cholesky(self.rho),
+            'post_step_fn': sabr_post_step,
+        }
+
     def drift(self, X: np.ndarray, t: float) -> np.ndarray:
         """
         Drift term for SABR model

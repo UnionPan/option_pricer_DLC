@@ -1,79 +1,90 @@
 .asset-selector {
   background: var(--panel-bg);
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: var(--shadow);
-  margin-bottom: 1.5rem;
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .asset-selector h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.125rem;
+  margin: 0 0 0.625rem 0;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
+/* ── Mode Toggle — raised bevel buttons ── */
 .mode-toggle {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 2px;
+  margin-bottom: 0.625rem;
 }
 
 .mode-btn {
   flex: 1;
-  padding: 0.5rem 1rem;
-  border: 2px solid var(--border-color);
-  background: var(--panel-bg-alt);
-  border-radius: 6px;
+  padding: 0.3125rem 0.625rem;
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  background: var(--panel-bg);
   cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-primary);
-  transition: all 0.2s;
+  border-radius: 0;
 }
 
 .mode-btn:hover {
-  border-color: var(--accent);
-  background: var(--panel-bg);
+  background: var(--panel-bg-alt);
 }
 
 .mode-btn.active {
-  background: rgba(37, 99, 235, 0.15);
+  border-color: var(--bevel-dark) var(--bevel-light) var(--bevel-light) var(--bevel-dark);
+  background: var(--well-bg);
   color: var(--accent);
-  border-color: var(--accent);
-  font-weight: 600;
 }
 
+/* ── Selected Assets ── */
 .selected-assets {
-  margin-bottom: 1rem;
-  padding: 0.75rem;
-  background: var(--panel-bg-alt);
-  border-radius: 6px;
+  margin-bottom: 0.625rem;
+  padding: 0.5rem;
+  background: var(--well-bg);
+  border: 2px solid;
+  border-color: var(--well-border-top) var(--well-border-right) var(--well-border-bottom) var(--well-border-left);
+  border-radius: 0;
 }
 
 .selected-assets label {
   display: block;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  margin-bottom: 0.375rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .asset-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.25rem;
 }
 
 .asset-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
-  background: rgba(37, 99, 235, 0.15);
+  gap: 0.375rem;
+  padding: 0.1875rem 0.5rem;
+  background: var(--panel-bg-alt);
   color: var(--accent);
   border: 1px solid var(--accent);
-  border-radius: 16px;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 600;
+  font-family: 'IBM Plex Mono', 'Lucida Console', monospace;
+  border-radius: 0;
 }
 
 .asset-chip .remove-btn {
@@ -81,82 +92,91 @@
   border: none;
   color: var(--accent);
   cursor: pointer;
-  font-size: 1.25rem;
+  font-size: 0.875rem;
   line-height: 1;
   padding: 0;
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  opacity: 0.6;
 }
 
 .asset-chip .remove-btn:hover {
   opacity: 1;
 }
 
+/* ── Popular Assets Grid ── */
 .popular-assets {
-  margin-bottom: 1rem;
+  margin-bottom: 0.625rem;
 }
 
 .popular-assets label {
   display: block;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  margin-bottom: 0.375rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .asset-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 2px;
 }
 
 .asset-btn {
-  padding: 0.5rem;
-  border: 2px solid var(--border-color);
-  background: var(--panel-bg-alt);
-  border-radius: 6px;
+  padding: 0.3125rem;
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  background: var(--panel-bg);
   cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-primary);
-  transition: all 0.2s;
   text-align: center;
+  font-family: 'IBM Plex Mono', 'Lucida Console', monospace;
+  border-radius: 0;
 }
 
 .asset-btn:hover {
-  border-color: var(--accent);
-  background: var(--panel-bg);
+  background: var(--panel-bg-alt);
 }
 
 .asset-btn.selected {
-  background: rgba(37, 99, 235, 0.15);
+  border-color: var(--bevel-dark) var(--bevel-light) var(--bevel-light) var(--bevel-dark);
+  background: var(--well-bg);
   color: var(--accent);
-  border-color: var(--accent);
-  font-weight: 600;
 }
 
+/* ── Custom Input ── */
 .custom-input {
-  margin-top: 1rem;
+  margin-top: 0.625rem;
 }
 
 .custom-input label {
   display: block;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  margin-bottom: 0.375rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .input-group {
   display: flex;
-  gap: 0.5rem;
+  gap: 2px;
 }
 
 .ticker-input {
   flex: 1;
-  padding: 0.5rem 0.75rem;
-  border: 2px solid var(--panel-border);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  transition: border-color 0.2s;
+  padding: 0.3125rem 0.5rem;
+  border: 2px solid;
+  border-color: var(--bevel-dark) var(--bevel-light) var(--bevel-light) var(--bevel-dark);
+  font-size: 0.8125rem;
+  background: var(--well-bg);
+  color: var(--text-primary);
+  font-family: 'IBM Plex Mono', 'Lucida Console', monospace;
+  border-radius: 0;
 }
 
 .ticker-input:focus {
@@ -165,19 +185,23 @@
 }
 
 .add-btn {
-  padding: 0.5rem 1.5rem;
+  padding: 0.3125rem 0.875rem;
   background: var(--accent);
   color: white;
-  border: none;
-  border-radius: 6px;
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
   cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: background 0.2s;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 0;
 }
 
 .add-btn:hover:not(:disabled) {
-  background: var(--accent-hover);
+  filter: brightness(1.1);
+}
+
+.add-btn:active:not(:disabled) {
+  border-color: var(--bevel-dark) var(--bevel-light) var(--bevel-light) var(--bevel-dark);
 }
 
 .add-btn:disabled {

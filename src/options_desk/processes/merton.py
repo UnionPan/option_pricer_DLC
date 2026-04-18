@@ -56,6 +56,21 @@ class MertonJD(JumpDiffusionProcess):
         self.params['mu_J'] = self.mu_J
         self.params['sigma_J'] = self.sigma_J
 
+    def _build_jax_spec(self):
+        from ._process_defs import (
+            MertonJDParams, merton_drift, merton_diffusion, merton_jump_fn,
+        )
+        return {
+            'drift_fn': merton_drift,
+            'diffusion_fn': merton_diffusion,
+            'params': MertonJDParams(
+                mu=self.mu, sigma=self.sigma, lambda_j=self.jump_intensity,
+                mu_J=self.mu_J, sigma_J=self.sigma_J,
+            ),
+            'dim': 1,
+            'jump_fn': merton_jump_fn,
+        }
+
     def drift(self, X: np.ndarray, t: float) -> np.ndarray:
         """
         Drift term: mu * S_t

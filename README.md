@@ -29,6 +29,26 @@ make frontend    # React dev server
 make test        # backend + frontend tests
 ```
 
+## Python Dependency Profiles
+Choose the JAX backend that matches your machine:
+
+```bash
+# Default portable install (CPU-safe)
+pip install -r requirements.txt
+
+# Apple Silicon Metal backend
+pip install -r requirements-mac-metal.txt
+
+# Linux + NVIDIA CUDA backend
+pip install -r requirements-linux-cuda.txt
+```
+
+For the `jax-metallib` backend, select the GPU at runtime with:
+
+```bash
+JAX_PLATFORMS=mps python your_script.py
+```
+
 ## Deploy to Cloud Run
 1. Authenticate `gcloud`, set your project/region, and enable Cloud Build + Cloud Run.
 2. Backend: `gcloud builds submit --config=deployment/cloudbuild/backend.yaml --substitutions=COMMIT_SHA=$(git rev-parse HEAD)`

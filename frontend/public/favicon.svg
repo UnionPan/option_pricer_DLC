@@ -1,0 +1,14 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="6" fill="#0a0e1a"/>
+  <defs>
+    <linearGradient id="g" x1="5" y1="26" x2="27" y2="4">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="60%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <!-- Bold A/delta with triangular counter cutout -->
+  <path d="M16 4 L27.5 26 L4.5 26 Z M16 15.5 L10.5 23 L21.5 23 Z" fill="url(#g)" fill-rule="evenodd"/>
+  <!-- Left-face highlight for depth -->
+  <path d="M16 4 L4.5 26" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
+</svg>
