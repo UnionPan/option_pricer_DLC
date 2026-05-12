@@ -4,7 +4,7 @@ JAX backend policy for process simulation.
 Backend resolution order:
   1. ``JAX_PLATFORMS`` if the user set one explicitly
   2. ``OPTIONS_DESK_JAX_BACKEND`` project-level override
-  3. Auto-detect: CUDA GPU → Apple Metal (MPS) → CPU
+  3. CPU
 
 Precision modes:
   - ``high``: float64 / complex128 (CPU, CUDA) — full COS accuracy
@@ -92,7 +92,12 @@ def get_backend_preference() -> str:
     Precedence:
       1. JAX_PLATFORMS if already set by the caller
       2. OPTIONS_DESK_JAX_BACKEND
-      3. Auto-detect: CUDA GPU if available, else CPU
+      3. CPU
+
+    We intentionally do not auto-probe GPU/MPS here. On Apple Silicon, merely
+    probing MPS can initialize or poison the process backend before notebooks
+    get a chance to select CPU, and the COS deep-hedging path needs CPU/CUDA
+    float64 for reliable training. Users can still opt into GPU explicitly.
     """
     jax_platforms = os.getenv("JAX_PLATFORMS")
     if jax_platforms:
@@ -102,7 +107,7 @@ def get_backend_preference() -> str:
     if project_backend:
         return project_backend
 
-    return _detect_gpu_backend()
+    return "cpu"
 
 
 def strict_backend_requested() -> bool:

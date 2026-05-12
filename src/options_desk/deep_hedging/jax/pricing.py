@@ -176,6 +176,21 @@ def compile_padded_grid(
 # Single-maturity pricing slice (vmap target)
 # ============================================================================
 
+def _enforce_vanilla_price_bounds(
+    option_prices: jnp.ndarray,
+    upper_bounds: jnp.ndarray,
+) -> jnp.ndarray:
+    """Sanitize non-finite COS output and enforce vanilla price bounds."""
+    cleaned = jnp.nan_to_num(
+        option_prices,
+        nan=0.0,
+        posinf=jnp.inf,
+        neginf=0.0,
+    )
+    cleaned = jnp.maximum(cleaned, 0.0)
+    return jnp.minimum(cleaned, upper_bounds)
+
+
 def _price_maturity_slice(
     spot: jnp.ndarray,
     v0: jnp.ndarray,
@@ -238,9 +253,16 @@ def _price_maturity_slice(
     call_prices = jnp.where(mask_row, call_prices, 0.0)
     put_prices = jnp.where(mask_row, put_prices, 0.0)
 
-    # Floor at zero (no negative prices)
-    call_prices = jnp.maximum(call_prices, 0.0)
-    put_prices = jnp.maximum(put_prices, 0.0)
+    # Vanilla no-arbitrage upper bounds. COS can overshoot badly near
+    # degenerate variance; never feed impossible option prices to RL.
+    call_prices = _enforce_vanilla_price_bounds(
+        call_prices,
+        spot * jnp.exp(-market.q * T),
+    )
+    put_prices = _enforce_vanilla_price_bounds(
+        put_prices,
+        strikes * jnp.exp(-market.r * T),
+    )
 
     # Interleave: [call_0, put_0, call_1, put_1, ...]
     # Use stack+ravel instead of .at[::2].set() for MPS compatibility under vmap
@@ -413,8 +435,10 @@ def price_option_grid(
         F_k_opt * V_k * half_weight[None, :], axis=-1
     )  # (n_options,)
 
-    # Floor at zero, mask unavailable and invalid (float masks)
-    option_prices = jnp.maximum(option_prices, 0.0)
+    call_upper = spot * jnp.exp(-market.q * T_opt)
+    put_upper = strikes_opt * jnp.exp(-market.r * T_opt)
+    upper_bound = is_call * call_upper + (1.0 - is_call) * put_upper
+    option_prices = _enforce_vanilla_price_bounds(option_prices, upper_bound)
     available_f = jnp.where(available, 1.0, 0.0)
     option_prices = option_prices * available_f * padded_grid.flat_valid
 

@@ -24,6 +24,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from options_desk.processes._jax_backend import configure_jax_runtime
+from options_desk.processes._jax_qe import qe_heston_step
 
 from ..utils.contracts import MarketTrajectory
 from .env import (
@@ -41,6 +42,31 @@ configure_jax_runtime()
 # ============================================================================
 # Heston single-step (inlined for lax.scan — no class dispatch)
 # ============================================================================
+
+def _heston_qe_step(
+    spot: jnp.ndarray,
+    variance: jnp.ndarray,
+    dt: float,
+    mu: float,
+    kappa: float,
+    theta: float,
+    sigma_v: float,
+    rho: float,
+    key: jax.Array,
+) -> tuple[jnp.ndarray, jnp.ndarray, jax.Array]:
+    """Andersen 2008 QE step for Heston.
+
+    Positivity-preserving variance via the Quadratic-Exponential scheme;
+    log-spot via central trapezoidal variance integral. Safe at borderline
+    Feller (where Euler-Maruyama produces v=0 and the CF pricer blows up).
+
+    Returns:
+        (next_spot, next_variance, next_key)
+    """
+    return qe_heston_step(
+        spot, variance, dt, mu, kappa, theta, sigma_v, rho, key,
+    )
+
 
 def _heston_euler_step(
     spot: jnp.ndarray,
@@ -103,13 +129,18 @@ def _simulate_market_core(
     horizon_steps: int,
     N_cos: int,
     L_cos: float,
+    scheme: str = "euler",
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Pure JAX core of the market simulation (vmap-safe, not JIT'd).
 
     Callers should use ``_jit_simulate_single`` or ``_jit_simulate_batch``
     which wrap this function with ``jax.jit`` and appropriate static args.
 
-    ``horizon_steps`` and ``N_cos`` must be static (they determine array shapes).
+    ``horizon_steps``, ``N_cos``, and ``scheme`` must be static.
+
+    Args:
+        scheme: 'euler' (default) or 'qe' (Andersen 2008 QE — positivity-
+            preserving for borderline-Feller params).
 
     Returns:
         (spots, variances, instrument_prices) as JAX arrays with shapes
@@ -136,11 +167,18 @@ def _simulate_market_core(
     def scan_body(carry, time_idx):
         spot, variance, key = carry
 
-        next_spot, next_var, key = _heston_euler_step(
-            spot, variance, dt, mu,
-            market.kappa, market.theta, market.sigma_v,
-            cholesky, key,
-        )
+        if scheme == "qe":
+            next_spot, next_var, key = _heston_qe_step(
+                spot, variance, dt, mu,
+                market.kappa, market.theta, market.sigma_v,
+                rho, key,
+            )
+        else:
+            next_spot, next_var, key = _heston_euler_step(
+                spot, variance, dt, mu,
+                market.kappa, market.theta, market.sigma_v,
+                cholesky, key,
+            )
 
         prices = price_option_grid(
             next_spot, next_var, padded_grid, market,
@@ -167,20 +205,20 @@ def _simulate_market_core(
 # ============================================================================
 # Module-level JIT'd wrappers
 # ============================================================================
-# horizon_steps (arg 6) and N_cos (arg 7) are static — they determine
-# array shapes (jnp.arange) and must be compile-time constants.
+# horizon_steps (arg 6), N_cos (arg 7), and scheme (arg 9) are static —
+# they determine array shapes / control flow and must be compile-time constants.
 
 _jit_simulate_single = jax.jit(
     _simulate_market_core,
-    static_argnums=(6, 7),
+    static_argnums=(6, 7, 9),
 )
 
 _jit_simulate_batch = jax.jit(
     jax.vmap(
         _simulate_market_core,
-        in_axes=(None, None, None, None, 0, None, None, None, None),
+        in_axes=(None, None, None, None, 0, None, None, None, None, None),
     ),
-    static_argnums=(6, 7),
+    static_argnums=(6, 7, 9),
 )
 
 
@@ -215,11 +253,12 @@ def simulate_heston_market(
         action masks for all horizon_steps + 1 time points (including t=0).
     """
     horizon = config.horizon_steps
+    scheme = getattr(config, "scheme", "euler")
 
     spots, variances, instrument_prices = _jit_simulate_single(
         market, padded_grid,
         initial_spot, initial_variance, key,
-        config.dt, horizon, N_cos, L_cos,
+        config.dt, horizon, N_cos, L_cos, scheme,
     )
 
     # Use precomputed masks if available, otherwise build on the fly
@@ -264,11 +303,12 @@ def simulate_heston_market_batch(
         across paths since they depend only on time, not state).
     """
     horizon = config.horizon_steps
+    scheme = getattr(config, "scheme", "euler")
 
     spots, variances, instrument_prices = _jit_simulate_batch(
         market, padded_grid,
         initial_spot, initial_variance, keys,
-        config.dt, horizon, N_cos, L_cos,
+        config.dt, horizon, N_cos, L_cos, scheme,
     )
 
     # Use precomputed masks if available, otherwise build on the fly
@@ -340,7 +380,7 @@ def replay_rollout(
 
         # Transaction accounting
         notional = np.dot(trade, prices_t)
-        tc = np.dot(tc_vector, np.abs(trade))
+        tc = np.dot(tc_vector, np.abs(trade * prices_t))
         cash = cash - notional - tc
 
         # Update positions

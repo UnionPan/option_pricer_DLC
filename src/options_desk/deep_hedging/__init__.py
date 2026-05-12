@@ -16,6 +16,8 @@ from .agents import (
     DoNothingAgent,
     DeltaHedgingAgent,
     DeepHedgingAgent,
+    AnalyticalDeltaHedger,
+    build_option_grid_spec,
 )
 from .utils import (
     ObservationBatch,
@@ -51,6 +53,8 @@ __all__ = [
     'DoNothingAgent',
     'DeltaHedgingAgent',
     'DeepHedgingAgent',
+    'AnalyticalDeltaHedger',
+    'build_option_grid_spec',
     'ObservationBatch',
     'ActionBatch',
     'LiabilitySpec',

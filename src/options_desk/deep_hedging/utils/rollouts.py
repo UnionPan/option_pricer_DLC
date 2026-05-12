@@ -8,7 +8,14 @@ from typing import Any
 
 import numpy as np
 
-from .contracts import LiabilitySpec, MarketTrajectory, ObservationBatch, TrajectoryBatch
+from .contracts import (
+    LiabilityPortfolio,
+    LiabilitySpec,
+    MarketTrajectory,
+    ObservationBatch,
+    TrajectoryBatch,
+    total_payoff_from_path,
+)
 
 
 def _ensure_single_path_trajectory(trajectory: MarketTrajectory) -> MarketTrajectory:
@@ -107,7 +114,7 @@ def collect_agent_rollout_from_market(
     agent: Any,
     config: Any,
     trajectory: MarketTrajectory,
-    liability: LiabilitySpec | None = None,
+    liability: LiabilityPortfolio | None = None,
     initial_cash: float = 0.0,
     action_mode: str = "target_positions",
     update_agent: bool = True,
@@ -192,7 +199,11 @@ def collect_agent_rollout_from_market(
     )
     terminal_liability_payoff = np.float32(0.0)
     if liability is not None:
-        terminal_liability_payoff = np.float32(liability.terminal_payoff(single_path.spots[-1]))
+        # Path-aware AND multi-leg aware: handles single-spec and
+        # Sequence[LiabilitySpec] uniformly, summing leg payoffs.
+        terminal_liability_payoff = np.float32(
+            total_payoff_from_path(liability, single_path.spots)
+        )
 
     rewards = _compute_rewards(
         portfolio_values=np.asarray(replay.portfolio_values, dtype=np.float32),

@@ -70,12 +70,23 @@ class DeepHedgingEnvConfig:
     transaction_cost_underlying: float = 1.0e-4
     transaction_cost_option: float = 1.0e-2
     risk_aversion: float = 1_000.0
+    # Variance discretization scheme for the Heston simulator.
+    # 'euler' — Euler-Maruyama with variance truncation at 0 (default; can
+    #           produce v=0 at borderline-Feller, leading to extreme
+    #           instrument prices and NaN training loss)
+    # 'qe'    — Andersen 2008 Quadratic-Exponential scheme; positivity-
+    #           preserving by construction, safe at borderline Feller
+    scheme: str = "euler"
 
     def __post_init__(self) -> None:
         if self.horizon_steps <= 0:
             raise ValueError("horizon_steps must be positive")
         if self.dt <= 0.0:
             raise ValueError("dt must be positive")
+        if self.scheme not in ("euler", "qe"):
+            raise ValueError(
+                f"scheme must be 'euler' or 'qe', got {self.scheme!r}"
+            )
 
 
 @dataclass(frozen=True)
@@ -215,7 +226,7 @@ def step_state(
     cost_vec = _as_jax_vector(transaction_costs)
 
     notional = jnp.dot(trade_vec, price_vec)
-    transaction_cost = jnp.dot(cost_vec, jnp.abs(trade_vec))
+    transaction_cost = jnp.dot(cost_vec, jnp.abs(trade_vec * price_vec))
     next_cash = state.cash - jnp.asarray([notional + transaction_cost], dtype=jnp.float32)
 
     return DeepHedgingState(

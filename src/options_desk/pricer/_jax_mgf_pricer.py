@@ -20,6 +20,7 @@ import numpy as np
 from typing import NamedTuple
 
 from ..processes._jax_utils import to_numpy
+from ._pricer_runtime import guard_pricer
 
 
 # ============================================================================
@@ -218,6 +219,7 @@ def bs_log_mgf(sigma: float, ttm: float, phi_grid: jnp.ndarray) -> jnp.ndarray:
 # ============================================================================
 # High-level JIT-compiled pricing functions
 # ============================================================================
+@guard_pricer
 @jax.jit(static_argnums=(11,))
 def heston_price_grid_jax(
     S: float, strikes: jnp.ndarray, is_call: jnp.ndarray,
@@ -251,6 +253,7 @@ def heston_price_grid_jax(
     return price_slice_from_mgf(log_mgf, phi_grid, forward, strikes, is_call, discfactor)
 
 
+@guard_pricer
 @jax.jit(static_argnums=(10,))
 def merton_price_grid_jax(
     S: float, strikes: jnp.ndarray, is_call: jnp.ndarray,
@@ -270,6 +273,7 @@ def merton_price_grid_jax(
     return price_slice_from_mgf(log_mgf, phi_grid, forward, strikes, is_call, discfactor)
 
 
+@guard_pricer
 @jax.jit(static_argnums=(14,))
 def bates_price_grid_jax(
     S: float, strikes: jnp.ndarray, is_call: jnp.ndarray,
@@ -293,6 +297,7 @@ def bates_price_grid_jax(
     return price_slice_from_mgf(log_mgf, phi_grid, forward, strikes, is_call, discfactor)
 
 
+@guard_pricer
 @jax.jit(static_argnums=(7,))
 def bs_price_grid_jax(
     S: float, strikes: jnp.ndarray, is_call: jnp.ndarray,

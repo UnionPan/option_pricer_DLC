@@ -29,6 +29,55 @@ except ImportError:  # pragma: no cover - torch is an optional dep
     _TORCH_AVAILABLE = False
 
 
+def _validate_positive(value: float, name: str) -> float:
+    value_f = float(value)
+    if value_f <= 0.0:
+        raise ValueError(f"{name} must be positive, got {value!r}")
+    return value_f
+
+
+def normalize_observation_parts(
+    spot: np.ndarray,
+    option_features: np.ndarray,
+    portfolio_features: np.ndarray,
+    previous_action: np.ndarray,
+    context_features: np.ndarray,
+    *,
+    price_scale: float = 100.0,
+    position_scale: float = 100.0,
+    price_clip: float = 10.0,
+) -> np.ndarray:
+    """Flatten observation parts onto the same feature scale used in training."""
+    price_scale = _validate_positive(price_scale, "price_scale")
+    position_scale = _validate_positive(position_scale, "position_scale")
+    price_clip = _validate_positive(price_clip, "price_clip")
+
+    spot_feature = np.clip(
+        np.asarray(spot, dtype=np.float32).ravel() / price_scale - 1.0,
+        -price_clip,
+        price_clip,
+    )
+    option_scaled = np.clip(
+        np.asarray(option_features, dtype=np.float32).ravel() / price_scale,
+        -price_clip,
+        price_clip,
+    )
+    portfolio_scaled = np.clip(
+        np.asarray(portfolio_features, dtype=np.float32).ravel() / position_scale,
+        -price_clip,
+        price_clip,
+    )
+    previous_scaled = np.clip(
+        np.asarray(previous_action, dtype=np.float32).ravel() / position_scale,
+        -price_clip,
+        price_clip,
+    )
+    context = np.asarray(context_features, dtype=np.float32).ravel()
+    return np.concatenate(
+        [spot_feature, option_scaled, portfolio_scaled, previous_scaled, context]
+    ).astype(np.float32)
+
+
 class HedgingMLPPolicy(nn.Module if _TORCH_AVAILABLE else object):
     """
     MLP policy for deep hedging.
@@ -43,7 +92,11 @@ class HedgingMLPPolicy(nn.Module if _TORCH_AVAILABLE else object):
         obs_dim: int,
         n_instruments: int,
         hidden_sizes: tuple[int, ...] = (64, 64),
-        position_limit: float = 100.0,
+        position_limit: float = 1.0,
+        last_layer_scale: float = 1e-3,
+        price_scale: float = 100.0,
+        position_scale: float = 100.0,
+        price_clip: float = 10.0,
     ) -> None:
         if not _TORCH_AVAILABLE:
             raise ImportError("HedgingMLPPolicy requires PyTorch")
@@ -51,6 +104,10 @@ class HedgingMLPPolicy(nn.Module if _TORCH_AVAILABLE else object):
         self.obs_dim = obs_dim
         self.n_instruments = n_instruments
         self.position_limit = position_limit
+        self.last_layer_scale = last_layer_scale
+        self.price_scale = _validate_positive(price_scale, "price_scale")
+        self.position_scale = _validate_positive(position_scale, "position_scale")
+        self.price_clip = _validate_positive(price_clip, "price_clip")
 
         layers: list[nn.Module] = []
         prev = obs_dim
@@ -58,8 +115,21 @@ class HedgingMLPPolicy(nn.Module if _TORCH_AVAILABLE else object):
             layers.append(nn.Linear(prev, h))
             layers.append(nn.ReLU())
             prev = h
-        layers.append(nn.Linear(prev, n_instruments))
+        self.output = nn.Linear(prev, n_instruments)
+        layers.append(self.output)
         self.net = nn.Sequential(*layers)
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        """Small output init prevents saturated tanh trades at epoch 0."""
+        for module in self.net:
+            if not isinstance(module, nn.Linear):
+                continue
+            nonlinearity = "linear" if module is self.output else "relu"
+            nn.init.kaiming_normal_(module.weight, nonlinearity=nonlinearity)
+            nn.init.zeros_(module.bias)
+        with torch.no_grad():
+            self.output.weight.mul_(self.last_layer_scale)
 
     def forward(
         self,
@@ -80,6 +150,10 @@ class HedgingMLPPolicy(nn.Module if _TORCH_AVAILABLE else object):
 
 def obs_batch_to_tensor(
     obs: ObservationBatch,
+    *,
+    price_scale: float = 100.0,
+    position_scale: float = 100.0,
+    price_clip: float = 10.0,
 ) -> tuple["torch.Tensor", "torch.Tensor"]:
     """
     Flatten an :class:`ObservationBatch` into ``(obs_tensor, mask_tensor)``.
@@ -94,14 +168,16 @@ def obs_batch_to_tensor(
     if not _TORCH_AVAILABLE:
         raise ImportError("obs_batch_to_tensor requires PyTorch")
 
-    parts = [
-        np.asarray(obs.spot, dtype=np.float32).ravel(),
-        np.asarray(obs.option_features, dtype=np.float32).ravel(),
-        np.asarray(obs.portfolio_features, dtype=np.float32).ravel(),
-        np.asarray(obs.previous_action, dtype=np.float32).ravel(),
-        np.asarray(obs.context_features, dtype=np.float32).ravel(),
-    ]
-    flat = np.concatenate(parts)
+    flat = normalize_observation_parts(
+        spot=obs.spot,
+        option_features=obs.option_features,
+        portfolio_features=obs.portfolio_features,
+        previous_action=obs.previous_action,
+        context_features=obs.context_features,
+        price_scale=price_scale,
+        position_scale=position_scale,
+        price_clip=price_clip,
+    )
     obs_tensor = torch.from_numpy(flat).unsqueeze(0)
 
     if obs.action_mask is not None:
@@ -124,30 +200,70 @@ class TorchPolicyAgent(BaseHedgingAgent):
 
     def __init__(
         self,
-        policy: HedgingMLPPolicy,
+        policy: "HedgingMLPPolicy",
         name: str = "TorchPolicyAgent",
     ) -> None:
         if not _TORCH_AVAILABLE:
             raise ImportError("TorchPolicyAgent requires PyTorch")
+        # position_limit may be None for recurrent policies that disable the
+        # tanh clamp; fall back to +inf for the BaseHedgingAgent bound.
+        position_limit = getattr(policy, "position_limit", None)
+        if position_limit is None:
+            position_limit = float("inf")
         super().__init__(
             n_instruments=policy.n_instruments,
-            position_limits=policy.position_limit,
+            position_limits=position_limit,
             name=name,
         )
         self.policy = policy
         self.policy.eval()
+        self.price_scale = getattr(policy, "price_scale", 100.0)
+        self.position_scale = getattr(policy, "position_scale", 100.0)
+        self.price_clip = getattr(policy, "price_clip", 10.0)
+
+        # Duck-type detect a recurrent policy that exposes init_hidden_state
+        # and step. Hidden state is carried across .act() calls and reset on
+        # .reset(). Non-recurrent policies leave _hidden_state at None.
+        self._is_recurrent = hasattr(policy, "init_hidden_state") and hasattr(
+            policy, "step"
+        )
+        self._hidden_state = None
+
+    def _policy_device(self) -> "torch.device":
+        try:
+            return next(self.policy.parameters()).device
+        except StopIteration:
+            return torch.device("cpu")
 
     def reset(self, observation: Any, info: Dict[str, Any]) -> None:
         super().reset(observation, info)
+        if self._is_recurrent:
+            self._hidden_state = self.policy.init_hidden_state(
+                batch_size=1, device=self._policy_device(),
+            )
 
     def act(
         self,
         observation: ObservationBatch,
         info: Dict[str, Any],
     ) -> np.ndarray:
-        obs_tensor, mask_tensor = obs_batch_to_tensor(observation)
+        obs_tensor, mask_tensor = obs_batch_to_tensor(
+            observation,
+            price_scale=self.price_scale,
+            position_scale=self.position_scale,
+            price_clip=self.price_clip,
+        )
         with torch.no_grad():
-            trades = self.policy(obs_tensor, mask_tensor)
+            if self._is_recurrent:
+                if self._hidden_state is None:
+                    self._hidden_state = self.policy.init_hidden_state(
+                        batch_size=1, device=obs_tensor.device,
+                    )
+                trades, self._hidden_state = self.policy.step(
+                    obs_tensor, mask_tensor, self._hidden_state,
+                )
+            else:
+                trades = self.policy(obs_tensor, mask_tensor)
         trade_np = trades.squeeze(0).cpu().numpy().astype(np.float32)
         if self.current_positions is None:
             self.current_positions = np.zeros(self.n_instruments, dtype=np.float32)

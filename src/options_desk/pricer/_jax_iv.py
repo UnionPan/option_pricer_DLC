@@ -17,6 +17,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from ..processes._jax_utils import to_numpy
+from ._pricer_runtime import guard_pricer
 
 
 # ============================================================================
@@ -50,6 +51,7 @@ def _bs_price_and_vega(S, K, T, r, q, sigma, is_call):
 # ============================================================================
 # Vectorized Newton-Raphson IV solver
 # ============================================================================
+@guard_pricer
 @jax.jit
 def implied_vol_batch(
     S: jnp.ndarray,

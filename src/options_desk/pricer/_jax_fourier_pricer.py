@@ -19,6 +19,7 @@ from typing import NamedTuple
 
 from ..processes._jax_backend import configure_jax_runtime
 from ..processes._jax_utils import to_numpy
+from ._pricer_runtime import guard_pricer
 
 configure_jax_runtime()
 
@@ -484,6 +485,7 @@ def _jax_carr_madan_fft(
 
 # ---------- GBM / Black-Scholes ----------
 
+@guard_pricer
 def jax_cos_price_gbm(
     S0: float, K: float, T: float, r: float, q: float,
     sigma: float, is_call: bool = True, N: int = 128, L: float = 10.0,
@@ -500,6 +502,7 @@ def jax_cos_price_gbm(
     return float(price)
 
 
+@guard_pricer
 def jax_cos_price_gbm_multi(
     S0: float, strikes: np.ndarray, T: float, r: float, q: float,
     sigma: float, is_call: np.ndarray, N: int = 128, L: float = 10.0,
@@ -520,6 +523,7 @@ def jax_cos_price_gbm_multi(
 
 # ---------- Heston ----------
 
+@guard_pricer
 def jax_cos_price_heston(
     S0: float, K: float, T: float, r: float, q: float,
     v0: float, kappa: float, theta: float, sigma_v: float, rho: float,
@@ -539,6 +543,7 @@ def jax_cos_price_heston(
     return float(price)
 
 
+@guard_pricer
 def jax_cos_price_heston_multi(
     S0: float, strikes: np.ndarray, T: float, r: float, q: float,
     v0: float, kappa: float, theta: float, sigma_v: float, rho: float,
@@ -562,6 +567,7 @@ def jax_cos_price_heston_multi(
 
 # ---------- Merton ----------
 
+@guard_pricer
 def jax_cos_price_merton(
     S0: float, K: float, T: float, r: float, q: float,
     sigma: float, lambda_j: float, mu_J: float, sigma_J: float,
@@ -582,6 +588,7 @@ def jax_cos_price_merton(
     return float(price)
 
 
+@guard_pricer
 def jax_cos_price_merton_multi(
     S0: float, strikes: np.ndarray, T: float, r: float, q: float,
     sigma: float, lambda_j: float, mu_J: float, sigma_J: float,
@@ -606,6 +613,7 @@ def jax_cos_price_merton_multi(
 
 # ---------- Bates ----------
 
+@guard_pricer
 def jax_cos_price_bates(
     S0: float, K: float, T: float, r: float, q: float,
     v0: float, kappa: float, theta: float, sigma_v: float, rho: float,
@@ -627,6 +635,7 @@ def jax_cos_price_bates(
     return float(price)
 
 
+@guard_pricer
 def jax_cos_price_bates_multi(
     S0: float, strikes: np.ndarray, T: float, r: float, q: float,
     v0: float, kappa: float, theta: float, sigma_v: float, rho: float,
@@ -652,6 +661,7 @@ def jax_cos_price_bates_multi(
 
 # ---------- Kou ----------
 
+@guard_pricer
 def jax_cos_price_kou(
     S0: float, K: float, T: float, r: float, q: float,
     sigma: float, lambda_j: float, p: float, eta_up: float, eta_down: float,
@@ -670,6 +680,7 @@ def jax_cos_price_kou(
     return float(price)
 
 
+@guard_pricer
 def jax_cos_price_kou_multi(
     S0: float, strikes: np.ndarray, T: float, r: float, q: float,
     sigma: float, lambda_j: float, p: float, eta_up: float, eta_down: float,
@@ -692,6 +703,7 @@ def jax_cos_price_kou_multi(
 
 # ---------- Variance Gamma ----------
 
+@guard_pricer
 def jax_cos_price_vg(
     S0: float, K: float, T: float, r: float, q: float,
     theta_vg: float, sigma: float, nu: float,
@@ -711,6 +723,7 @@ def jax_cos_price_vg(
     return float(price)
 
 
+@guard_pricer
 def jax_cos_price_vg_multi(
     S0: float, strikes: np.ndarray, T: float, r: float, q: float,
     theta_vg: float, sigma: float, nu: float,
@@ -734,6 +747,7 @@ def jax_cos_price_vg_multi(
 
 # ---------- NIG ----------
 
+@guard_pricer
 def jax_cos_price_nig(
     S0: float, K: float, T: float, r: float, q: float,
     alpha: float, beta: float, delta: float,
@@ -754,6 +768,7 @@ def jax_cos_price_nig(
     return float(price)
 
 
+@guard_pricer
 def jax_cos_price_nig_multi(
     S0: float, strikes: np.ndarray, T: float, r: float, q: float,
     alpha: float, beta: float, delta: float,
@@ -790,6 +805,7 @@ def _carr_madan_interp(
     return price
 
 
+@guard_pricer
 def jax_carr_madan_price_gbm(
     S0: float, K: float, T: float, r: float, q: float,
     sigma: float, is_call: bool = True,
@@ -806,6 +822,7 @@ def jax_carr_madan_price_gbm(
     return _carr_madan_interp(k_u, call_prices, K, S0, T, r, q, is_call)
 
 
+@guard_pricer
 def jax_carr_madan_price_heston(
     S0: float, K: float, T: float, r: float, q: float,
     v0: float, kappa: float, theta: float, sigma_v: float, rho: float,
@@ -823,6 +840,7 @@ def jax_carr_madan_price_heston(
     return _carr_madan_interp(k_u, call_prices, K, S0, T, r, q, is_call)
 
 
+@guard_pricer
 def jax_carr_madan_price_merton(
     S0: float, K: float, T: float, r: float, q: float,
     sigma: float, lambda_j: float, mu_J: float, sigma_J: float,
