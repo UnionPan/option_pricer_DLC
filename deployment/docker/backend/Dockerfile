@@ -11,6 +11,7 @@ RUN rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
 COPY requirements.txt ./requirements.txt
+COPY requirements-base.txt ./requirements-base.txt
 COPY backend/requirements.txt ./backend-requirements.txt
 COPY pyproject.toml ./
 
