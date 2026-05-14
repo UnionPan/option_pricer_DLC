@@ -9,7 +9,6 @@ __pycache__/
 
 notes/
 tests/
-data/
 
 # Distribution / packaging
 .Python
