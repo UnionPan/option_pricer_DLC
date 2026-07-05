@@ -122,50 +122,50 @@ def test_parity_vs_scipy():
             f"Asset {i}: n_observations mismatch"
 
 
-def test_hurst_recovery():
+def test_variogram_cannot_resolve_H_at_default_settings():
     """
-    Test that H is recovered within tolerance for H = 0.4.
+    Document the reference estimator's H-resolution limit (faithful-port pin).
 
-    NOTE: The variogram method has known limitations for very low H values (<0.3).
-    With simulated fBm log-vol data, the estimator tends to be biased toward 0.49
-    (the upper clip) for H < 0.3. This matches the scipy reference behavior.
-    We test with H=0.4 where recovery is more reliable (within 0.1 abs tolerance).
+    At default settings the estimator's rolling window (20 days) exceeds the
+    variogram lags (<= 10 days), so overlap-smoothing of the realized-variance
+    proxy destroys the roughness signal: for genuinely rough paths (true
+    H=0.1) BOTH the scipy reference and the batched port return H ~ 0.49,
+    the clip ceiling. This test pins that behavior so the batched port stays
+    a faithful replica of the normative scipy calibrator, and makes the
+    limitation explicit instead of pretending recovery works. Universe-scale
+    rough-vol estimation is deferred to the Phase 4 NPE estimator per the
+    spec.
     """
     n_days = 1500
     dt = 1 / 252
     window = 20
     max_lag = 10
 
+    true_H = 0.1
     eta = 1.0
     xi0 = 0.04
-    mu = 0.0
-    rho = 0.0
 
-    # Test with H=0.4 (more reliable recovery)
-    true_H = 0.4
-
-    # Simulate 3 paths for robustness
-    H_estimates = []
     for i in range(3):
         returns = _simulate_rbergomi_path(
-            true_H, eta, xi0, mu, rho, dt, n_days, seed=640 + i
+            true_H, eta, xi0, 0.0, 0.0, dt, n_days, seed=610 + i
         )
         # Convert to prices
         log_prices = np.cumsum(np.concatenate([[0], returns]))
         prices = 100.0 * np.exp(log_prices)
 
-        # Calibrate
+        # Scipy reference: hits the 0.49 clip ceiling on rough paths
+        ref = RoughBergomiCalibrator(window=window, max_lag=max_lag).fit(prices, dt=dt)
+        assert ref.H == pytest.approx(0.49, abs=0.02), \
+            f"Path {i}: scipy reference expected at clip ceiling, got H={ref.H}"
+
+        # Batched port: must exhibit the same limitation (faithful port)
         returns_arr = np.diff(np.log(prices))
         returns_batch = returns_arr.reshape(1, -1)
         mask_batch = np.ones_like(returns_batch)
 
         out = brbergomi.fit_batch(returns_batch, mask_batch, dt, window=window, max_lag=max_lag)
-        H_estimates.append(out["H"][0])
-
-    # Check mean recovery (within 0.1 abs)
-    mean_H = np.mean(H_estimates)
-    assert abs(mean_H - true_H) < 0.15, \
-        f"H recovery failed for true H={true_H}: got mean {mean_H} from {H_estimates}"
+        assert out["H"][0] == pytest.approx(0.49, abs=0.02), \
+            f"Path {i}: batched port expected at clip ceiling, got H={out['H'][0]}"
 
 
 def test_padding_does_not_leak():
