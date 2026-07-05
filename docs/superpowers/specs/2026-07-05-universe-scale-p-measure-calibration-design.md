@@ -30,8 +30,10 @@ regime switching) but does not scale:
 - **Data source:** yfinance + a local parquet cache. The fetcher sits behind
   a store interface so a paid bulk API can be swapped in later.
 - **Model set at universe scale:** all of it — fast core (GBM, GARCH, Heston
-  QMLE), moderate (Merton, OU, rBergomi variogram), and the particle filters
-  (feasible only via GPU batching).
+  QMLE), moderate (Merton, OU, rBergomi variogram), and full-fidelity SV
+  calibration. *(Amended 2026-07-05:)* the full-fidelity tier is delivered by
+  amortized neural posterior estimation rather than GPU particle filters;
+  the particle filters remain per-asset validation tools.
 - **Cross-asset deliverables:** robust factor covariance at N=3000,
   statistical factor model (PCA/POET), DCC-GARCH on factor returns, and
   hierarchical (empirical-Bayes) pooling of per-name parameters.
@@ -53,7 +55,7 @@ src/options_desk/calibration/
     universe.py             # named universes + sector metadata
   physical/batched/         # JAX batched calibrators (new)
     gbm.py, ou.py, heston_qmle.py, rbergomi.py, garch.py, merton.py
-    particle/heston_pf.py, rbergomi_pf.py
+    npe/                    # amortized posterior estimation (Phase 4)
   cross_asset/              # new package
     factor_model.py         # PCA/POET factor covariance
     dcc.py                  # DCC-GARCH on factor returns
@@ -108,11 +110,20 @@ over a leading asset axis.)
   optimization is a jit'd L-BFGS (`optimistix` or `jaxopt`) vmapped across
   assets, with multi-start from a small grid of initial values, taking the
   best likelihood per asset.
-- **Particle filters (Heston, rBergomi):** `lax.scan` over time, `vmap` over
-  assets, particles as an inner vectorized dimension; systematic resampling;
-  float32 throughout. GPU memory scales with N × n_particles, so the runner
-  chunks assets (~256 per chunk, tunable). Target: universe-scale particle
-  filtering in minutes instead of CPU-hours.
+- **Variance-proxy upgrade:** the Heston QMLE realized-variance proxy moves
+  from squared close-close returns to an OHLC range-based estimator
+  (Garman-Klass / Yang-Zhang) — ~7× more efficient, zero runtime cost (OHLC
+  is already in the price lake), and it directly attacks the documented
+  κ/ρ estimation biases.
+- **Full-fidelity SV (Heston, rBergomi): amortized neural posterior
+  estimation (NPE)** — simulate (θ, path) training pairs from the existing
+  JAX simulators, train a conditional normalizing-flow posterior
+  q(θ | path summary) once; per-asset calibration is then a single forward
+  pass (microseconds → whole universe in seconds) and returns a full
+  posterior, not a point estimate. Posterior widths are the estimation-noise
+  input to Layer 3's hierarchical pooling. Works identically for rBergomi,
+  which has no tractable likelihood. The existing scipy particle filters
+  remain per-asset validation tools and are not scaled universe-wide.
 - **Validation:** the existing scipy calibrators are the golden references.
   Two test families per model: (a) parity — JAX vs scipy on the same
   synthetic series within documented tolerances; (b) recovery — simulate
@@ -187,8 +198,13 @@ Each phase is independently useful and gets its own implementation plan:
    the GPU path.
 3. **Cross-asset suite** — factor covariance, hierarchical pooling,
    DCC-GARCH on factors.
-4. **Particle filters on GPU** — batched Heston and rBergomi particle
-   filters with asset chunking and chunk checkpoints.
+4. **Full-fidelity SV at scale** — (a) OHLC range-based variance proxies
+   wired into the batched Heston QMLE (quick win, Phase 2-adjacent);
+   (b) amortized NPE: simulation-based training set from the JAX
+   Heston/rBergomi simulators, conditional-flow posterior estimator,
+   universe batch calibration with posteriors feeding Phase 3's pooling;
+   (c) cross-validation of NPE posteriors against the scipy particle
+   filters on a small name sample.
 
 ## Out of scope
 
