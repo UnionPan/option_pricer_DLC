@@ -51,7 +51,7 @@ def _scalars(result) -> dict:
     """Flatten a calibration result dataclass to its scalar fields."""
     d = asdict(result) if is_dataclass(result) else dict(result)
     return {k: v for k, v in d.items()
-            if isinstance(v, (int, float, bool, str, np.floating, np.integer))}
+            if isinstance(v, (int, float, bool, str, np.floating, np.integer, np.bool_))}
 
 
 def _fit_gbm(prices: np.ndarray, dt: float) -> dict:

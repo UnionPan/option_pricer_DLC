@@ -34,16 +34,17 @@ def test_gbm_fit_returns_flat_scalar_dict():
     out = get_model("gbm").fit(_gbm_prices(), 1.0 / 252.0)
     assert isinstance(out, dict)
     assert out["sigma"] == pytest.approx(0.2, abs=0.03)
-    assert all(isinstance(v, (int, float, bool, str)) for v in out.values())
+    assert all(isinstance(v, (int, float, bool, str, np.floating, np.integer, np.bool_)) for v in out.values())
 
 
 def test_heston_qmle_fit_returns_flat_scalar_dict():
     out = get_model("heston_qmle").fit(_gbm_prices(n=1500), 1.0 / 252.0)
     assert {"kappa", "theta", "sigma_v", "rho", "mu", "v0"} <= set(out)
-    assert all(isinstance(v, (int, float, bool, str)) for v in out.values())
+    assert all(isinstance(v, (int, float, bool, str, np.floating, np.integer, np.bool_)) for v in out.values())
+    assert "feller_condition" in out
 
 
 def test_garch_fit_returns_flat_scalar_dict():
     out = get_model("garch").fit(_gbm_prices(n=1000), 1.0 / 252.0)
     assert {"omega", "alpha", "beta"} <= set(out)
-    assert all(isinstance(v, (int, float, bool, str)) for v in out.values())
+    assert all(isinstance(v, (int, float, bool, str, np.floating, np.integer, np.bool_)) for v in out.values())
