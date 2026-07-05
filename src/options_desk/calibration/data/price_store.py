@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,15 @@ class EnsureReport:
     fetched: list[str]
     cached: list[str]
     failed: dict[str, str]
+
+
+@dataclass
+class ReturnsMatrix:
+    """Aligned (T, N) float32 log-return matrix + provenance."""
+    returns: "np.ndarray"          # (T, N)
+    dates: pd.DatetimeIndex        # (T,) — date of each return row
+    tickers: list[str]             # (N,)
+    excluded: dict[str, str]       # ticker -> reason
 
 
 class PriceStore:
@@ -119,6 +129,58 @@ class PriceStore:
                 }
             self._save_coverage(cov)
         return EnsureReport(fetched=fetched, cached=cached, failed=failed)
+
+    def returns_matrix(
+        self,
+        tickers: list[str],
+        start,
+        end,
+        min_obs: int = 504,
+        max_ffill: int = 5,
+        edge_tolerance_days: int = 5,
+        price_col: str = "adj_close",
+    ) -> ReturnsMatrix:
+        """Aligned log-return matrix over [start, end] with an explicit
+        NaN policy; every dropped name gets a reason in ``excluded``."""
+        start, end = pd.Timestamp(start), pd.Timestamp(end)
+        excluded: dict[str, str] = {}
+        series: dict[str, pd.Series] = {}
+        for t in [t.upper() for t in tickers]:
+            df = self.get_prices(t)
+            if df is None:
+                excluded[t] = "no data in store"
+                continue
+            s = df.loc[(df.index >= start) & (df.index <= end), price_col].dropna()
+            s = s[s > 0]
+            if len(s) < min_obs:
+                excluded[t] = f"insufficient history ({len(s)} < {min_obs})"
+                continue
+            series[t] = s
+
+        if not series:
+            return ReturnsMatrix(
+                returns=np.zeros((0, 0), dtype=np.float32),
+                dates=pd.DatetimeIndex([]), tickers=[], excluded=excluded)
+
+        panel = pd.DataFrame(series)          # union of all dates, NaN-padded
+        grid = panel.index
+        tol = pd.tseries.offsets.BDay(edge_tolerance_days)
+        keep: list[str] = []
+        for t in panel.columns:
+            col = panel[t].dropna()
+            if col.index[0] > grid[0] + tol or col.index[-1] < grid[-1] - tol:
+                excluded[t] = "partial window coverage"
+            elif panel[t].ffill(limit=max_ffill).loc[col.index[0]:].isna().any():
+                excluded[t] = "gap exceeds max_ffill"
+            else:
+                keep.append(t)
+
+        filled = panel[keep].ffill(limit=max_ffill).dropna(axis=0, how="any")
+        log_prices = np.log(filled.to_numpy(dtype=np.float64))
+        returns = np.diff(log_prices, axis=0).astype(np.float32)
+        return ReturnsMatrix(
+            returns=returns, dates=filled.index[1:],
+            tickers=list(keep), excluded=excluded)
 
 
 _YF_RENAME = {"Open": "open", "High": "high", "Low": "low",

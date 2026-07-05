@@ -126,3 +126,70 @@ def test_split_single_ticker_frame():
     out = _split_multi_ticker_frame(raw, ["AAPL"])
     assert set(out) == {"AAPL"}
     assert list(out["AAPL"].columns) == PRICE_COLUMNS
+
+
+def _store_with(tmp_path, series: dict[str, pd.Series]) -> PriceStore:
+    store = PriceStore(tmp_path, fetcher=lambda t, s, e: {})
+    for tkr, s in series.items():
+        close = s.astype(float)
+        df = pd.DataFrame({c: close for c in ["open", "high", "low", "close",
+                                              "adj_close"]})
+        df["volume"] = 1e6
+        store.put_prices(tkr, df)
+    return store
+
+
+def test_returns_matrix_alignment_and_shape(tmp_path):
+    idx = pd.bdate_range("2023-01-02", periods=300)
+    store = _store_with(tmp_path, {
+        "AAA": pd.Series(range(100, 400), index=idx),
+        "BBB": pd.Series(range(200, 500), index=idx),
+    })
+    rm = store.returns_matrix(["AAA", "BBB"], idx[0], idx[-1], min_obs=250)
+    assert rm.tickers == ["AAA", "BBB"]
+    assert rm.returns.shape == (299, 2)              # T-1 log returns
+    assert rm.returns.dtype == np.float32
+    assert rm.excluded == {}
+    assert len(rm.dates) == 299
+
+
+def test_returns_matrix_excludes_short_history(tmp_path):
+    idx = pd.bdate_range("2023-01-02", periods=300)
+    short_idx = idx[-100:]
+    store = _store_with(tmp_path, {
+        "AAA": pd.Series(range(100, 400), index=idx),
+        "NEW": pd.Series(range(100, 200), index=short_idx),
+    })
+    rm = store.returns_matrix(["AAA", "NEW"], idx[0], idx[-1], min_obs=250)
+    assert rm.tickers == ["AAA"]
+    assert "NEW" in rm.excluded
+    assert "insufficient" in rm.excluded["NEW"]
+
+
+def test_returns_matrix_ffills_small_gaps_only(tmp_path):
+    idx = pd.bdate_range("2023-01-02", periods=300)
+    gappy = pd.Series(np.arange(100.0, 400.0), index=idx)
+    gappy = gappy.drop(idx[50:53])                    # 3-day gap: OK
+    holey = pd.Series(np.arange(100.0, 400.0), index=idx)
+    holey = holey.drop(idx[100:110])                  # 10-day gap: excluded
+    store = _store_with(tmp_path, {
+        "AAA": pd.Series(np.arange(100.0, 400.0), index=idx),
+        "GAP": gappy, "HOLE": holey,
+    })
+    rm = store.returns_matrix(["AAA", "GAP", "HOLE"], idx[0], idx[-1],
+                              min_obs=250, max_ffill=5)
+    assert rm.tickers == ["AAA", "GAP"]
+    assert rm.excluded["HOLE"] == "gap exceeds max_ffill"
+    assert not np.isnan(rm.returns).any()
+
+
+def test_returns_matrix_excludes_partial_window(tmp_path):
+    idx = pd.bdate_range("2023-01-02", periods=300)
+    late_idx = idx[30:]                               # starts 30 bd late
+    store = _store_with(tmp_path, {
+        "AAA": pd.Series(np.arange(100.0, 400.0), index=idx),
+        "LATE": pd.Series(np.arange(100.0, 370.0), index=late_idx),
+    })
+    rm = store.returns_matrix(["AAA", "LATE"], idx[0], idx[-1], min_obs=250)
+    assert rm.tickers == ["AAA"]
+    assert rm.excluded["LATE"] == "partial window coverage"
