@@ -42,6 +42,8 @@ class PriceStore:
         self.prices_dir = self.root / "prices"
         self.prices_dir.mkdir(parents=True, exist_ok=True)
         self._coverage_path = self.root / "coverage.json"
+        if fetcher is None:
+            fetcher = fetch_yfinance
         self._fetcher = fetcher
 
     # -- storage ----------------------------------------------------------
@@ -101,12 +103,7 @@ class PriceStore:
         if need:
             logger.info("PriceStore.ensure: fetching %d/%d tickers (%s..%s)",
                         len(need), len(tickers), start, end)
-            if self._fetcher is None:
-                from .price_store import fetch_yfinance as fetcher  # type: ignore
-                fetcher_to_use = fetcher
-            else:
-                fetcher_to_use = self._fetcher
-            got = fetcher_to_use(need, start, end)
+            got = self._fetcher(need, start, end)
             got = {k.upper(): v for k, v in got.items()}
             for t in need:
                 df = got.get(t)
@@ -122,3 +119,72 @@ class PriceStore:
                 }
             self._save_coverage(cov)
         return EnsureReport(fetched=fetched, cached=cached, failed=failed)
+
+
+_YF_RENAME = {"Open": "open", "High": "high", "Low": "low",
+              "Close": "close", "Adj Close": "adj_close", "Volume": "volume"}
+
+
+def _split_multi_ticker_frame(
+    raw: pd.DataFrame, tickers: list[str],
+) -> dict[str, pd.DataFrame]:
+    """Split a (possibly MultiIndex-column) yf.download frame into
+    per-ticker OHLCV frames with our canonical column names. Tickers with
+    no data are simply absent from the result."""
+    out: dict[str, pd.DataFrame] = {}
+    for t in tickers:
+        if isinstance(raw.columns, pd.MultiIndex):
+            if t not in raw.columns.get_level_values(0):
+                continue
+            df_t = raw[t].copy()
+        else:
+            df_t = raw.copy()
+        df_t = df_t.rename(columns=_YF_RENAME)
+        missing = [c for c in PRICE_COLUMNS if c not in df_t.columns]
+        if missing:
+            continue
+        df_t = df_t[PRICE_COLUMNS].dropna(how="all")
+        if not df_t.empty:
+            out[t] = df_t
+    return out
+
+
+def fetch_yfinance(
+    tickers: list[str],
+    start: str,
+    end: str,
+    chunk_size: int = 100,
+    max_retries: int = 3,
+    pause: float = 1.0,
+) -> dict[str, pd.DataFrame]:
+    """Chunked multi-ticker yfinance download with exponential-backoff
+    retries. Returns only tickers that came back with data."""
+    import time
+
+    import yfinance as yf
+
+    out: dict[str, pd.DataFrame] = {}
+    n_chunks = (len(tickers) + chunk_size - 1) // chunk_size
+    for i in range(0, len(tickers), chunk_size):
+        chunk = tickers[i:i + chunk_size]
+        raw = None
+        for attempt in range(max_retries):
+            try:
+                raw = yf.download(
+                    chunk, start=start, end=end, group_by="ticker",
+                    auto_adjust=False, actions=False,
+                    progress=False, threads=True,
+                )
+                break
+            except Exception as e:                       # noqa: BLE001
+                logger.warning("yfinance chunk %d/%d attempt %d failed: %s",
+                               i // chunk_size + 1, n_chunks, attempt + 1, e)
+                time.sleep(pause * (2 ** attempt))
+        if raw is None or raw.empty:
+            continue
+        out.update(_split_multi_ticker_frame(raw, chunk))
+        logger.info("fetched chunk %d/%d: %d/%d tickers",
+                    i // chunk_size + 1, n_chunks,
+                    len(_split_multi_ticker_frame(raw, chunk)), len(chunk))
+        time.sleep(pause)
+    return out

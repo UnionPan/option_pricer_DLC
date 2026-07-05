@@ -98,3 +98,31 @@ def test_coverage_ledger_persists_across_instances(tmp_path):
     rep = PriceStore(tmp_path, fetcher=exploding).ensure(
         ["AAPL"], "2024-01-01", "2024-06-01")
     assert rep.cached == ["AAPL"]
+
+
+def test_split_multi_ticker_frame():
+    from options_desk.calibration.data.price_store import _split_multi_ticker_frame
+
+    idx = pd.bdate_range("2024-01-01", periods=5)
+    cols = pd.MultiIndex.from_product(
+        [["AAPL", "MSFT"], ["Open", "High", "Low", "Close", "Adj Close", "Volume"]])
+    raw = pd.DataFrame(1.0, index=idx, columns=cols)
+    raw.loc[:, ("MSFT", "Close")] = float("nan")   # partially-nan column survives
+    raw.loc[:, ("MSFT", "Open")] = float("nan")
+
+    out = _split_multi_ticker_frame(raw, ["AAPL", "MSFT", "GONE"])
+    assert set(out) == {"AAPL", "MSFT"}            # GONE absent, not an error
+    assert list(out["AAPL"].columns) == PRICE_COLUMNS
+    assert len(out["AAPL"]) == 5
+
+
+def test_split_single_ticker_frame():
+    from options_desk.calibration.data.price_store import _split_multi_ticker_frame
+
+    idx = pd.bdate_range("2024-01-01", periods=5)
+    raw = pd.DataFrame(
+        {"Open": 1.0, "High": 1.0, "Low": 1.0, "Close": 1.0,
+         "Adj Close": 1.0, "Volume": 1.0}, index=idx)
+    out = _split_multi_ticker_frame(raw, ["AAPL"])
+    assert set(out) == {"AAPL"}
+    assert list(out["AAPL"].columns) == PRICE_COLUMNS
