@@ -99,11 +99,63 @@ def test_garch_recovery():
         assert result["converged"][i], f"Asset {i} did not converge"
 
 
+def test_fixed_params_nll_isolation():
+    """
+    Test (b'): FIXED-PARAMS NLL isolation check (no optimizer).
+
+    Evaluates the masked NLL function directly -- the same code path the
+    optimizer differentiates -- for the same asset padded-in-batch vs alone,
+    at the same fixed (omega, alpha, beta, mu) and the same var_init.
+
+    This cleanly proves the mask handling is exact: padded steps contribute
+    zero NLL and carry sigma^2 forward unchanged. Any difference beyond
+    float32 reduction jitter (rel=1e-5) would indicate a mask leak, and
+    legitimizes the wider endpoint tolerances in test_padding_does_not_leak
+    as optimizer-trajectory effects rather than mask bugs.
+    """
+    import jax.numpy as jnp
+    from options_desk.calibration.physical.batched.garch import (
+        _garch_log_likelihood,
+        _unconstrain_params,
+    )
+
+    rets = _simulate_garch(2e-6, 0.08, 0.90, 500, seed=42)
+
+    # Alone: T=500, mask all ones
+    R_alone, M_alone = pad_returns([rets])
+    # Padded: same asset right-padded to T=900 alongside a longer asset
+    rets_long = _simulate_garch(2e-6, 0.10, 0.85, 900, seed=43)
+    R_batch, M_batch = pad_returns([rets, rets_long])
+
+    # Fixed parameters (arbitrary valid GARCH point) and shared var_init
+    omega_fixed, alpha_fixed, beta_fixed = 2e-6, 0.08, 0.90
+    mu_fixed = float(np.mean(rets))
+    var_init = np.float32(np.var(rets, ddof=1))
+
+    a, b, c = _unconstrain_params(omega_fixed, alpha_fixed, beta_fixed)
+    params = jnp.array([a, b, c, mu_fixed])
+
+    nll_alone = float(_garch_log_likelihood(
+        params, jnp.asarray(R_alone[0]), jnp.asarray(M_alone[0]), var_init
+    ))
+    nll_padded = float(_garch_log_likelihood(
+        params, jnp.asarray(R_batch[0]), jnp.asarray(M_batch[0]), var_init
+    ))
+
+    rel_diff = abs(nll_padded - nll_alone) / max(abs(nll_alone), 1e-30)
+    assert rel_diff <= 1e-5, (
+        f"Mask leak detected: NLL alone={nll_alone:.8f}, "
+        f"NLL padded={nll_padded:.8f}, rel diff={rel_diff:.2e} > 1e-5"
+    )
+
+
 def test_padding_does_not_leak():
     """
     Test (b): verify that padding does not affect parameter estimates.
 
-    Tolerance: rel=1e-3 (given iterative optimizer).
+    Endpoint tolerances are wide (see below) because the multi-start Adam
+    optimizer can follow different trajectories under vmap; the exactness of
+    the mask handling itself is proven by test_fixed_params_nll_isolation.
     """
     # Create two assets with different lengths
     rets1 = _simulate_garch(2e-6, 0.08, 0.90, 500, seed=42)
