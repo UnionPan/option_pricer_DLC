@@ -182,9 +182,10 @@ def fetch_yfinance(
                 time.sleep(pause * (2 ** attempt))
         if raw is None or raw.empty:
             continue
-        out.update(_split_multi_ticker_frame(raw, chunk))
+        chunk_result = _split_multi_ticker_frame(raw, chunk)
+        out.update(chunk_result)
         logger.info("fetched chunk %d/%d: %d/%d tickers",
                     i // chunk_size + 1, n_chunks,
-                    len(_split_multi_ticker_frame(raw, chunk)), len(chunk))
+                    len(chunk_result), len(chunk))
         time.sleep(pause)
     return out
