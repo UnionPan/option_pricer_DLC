@@ -42,6 +42,17 @@ from .heston_particle_filter import (
     HestonParticleFilter,
     HestonParticleFilterResult,
 )
+from .heston_qmle import (
+    HestonQMLECalibrator,
+    HestonQMLEResult,
+)
+from .multi_asset_pipeline import (
+    AssetCalibration,
+    DEFAULT_BASKET_50,
+    calibrate_universe,
+    calibration_report,
+    save_calibration,
+)
 from .rough_bergomi_particle_filter import (
     RoughBergomiParticleFilter,
     RoughBergomiParticleFilterResult,
@@ -94,6 +105,17 @@ __all__ = [
     'HestonParticleFilterResult',
     'RoughBergomiParticleFilter',
     'RoughBergomiParticleFilterResult',
+
+    # Heston QMLE (physical-measure SV calibration)
+    'HestonQMLECalibrator',
+    'HestonQMLEResult',
+
+    # Multi-asset calibration pipeline
+    'AssetCalibration',
+    'DEFAULT_BASKET_50',
+    'calibrate_universe',
+    'calibration_report',
+    'save_calibration',
 
     # Correlation
     'CorrelationCalibrator',
