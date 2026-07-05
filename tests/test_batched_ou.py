@@ -77,24 +77,30 @@ def test_padding_does_not_leak():
 
 def test_recovery():
     """Test parameter recovery on long simulated paths."""
-    # Use longer paths for better recovery (matching GBM test length)
+    # T=100_000 (matching GBM test length). kappa >= 2.0 so the half-life
+    # is well-resolved at daily dt; kappa MLE upward bias ~ +2/(T*dt) is
+    # negligible here (~0.005).
     n_assets = 4
     n = 100_000
     paths = []
+    true_kappas = []
     true_sigmas = []
 
     for i in range(n_assets):
-        kappa = 0.8 + 0.4 * i
+        kappa = 2.0 + 0.5 * i
         theta = 0.05
         sigma = 0.10 + 0.02 * i  # Varying sigma
         x0 = theta
         path = _simulate_ou_exact(kappa, theta, sigma, x0, 1/252, n, seed=200 + i)
         paths.append(path)
+        true_kappas.append(kappa)
         true_sigmas.append(sigma)
 
     levels, mask = pad_levels(paths)
     out = bou.fit_batch(levels, mask, 1 / 252)
 
     for i in range(n_assets):
+        # Check kappa recovery within 15% (per brief)
+        assert out["kappa"][i] == pytest.approx(true_kappas[i], rel=0.15)
         # Check sigma recovery within 2% (matching GBM test tolerance)
         assert out["sigma"][i] == pytest.approx(true_sigmas[i], rel=0.02)
