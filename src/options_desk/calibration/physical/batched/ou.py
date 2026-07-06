@@ -1,7 +1,7 @@
 """
-Batched Ornstein-Uhlenbeck exact MLE calibration via JAX.
+Batched Ornstein-Uhlenbeck AR(1) discretization MLE calibration via JAX.
 
-Matches conventions of physical/ou_calibrator.py (scipy version, method='exact_mle').
+Matches conventions of physical/ou_calibrator.py (scipy version, method='discretization').
 """
 import jax
 import jax.numpy as jnp

@@ -104,7 +104,7 @@ def _calibrate_batch(
 
     # Try batch calibration
     try:
-        result_dict = spec.fit_batch(valid_prices)
+        result_dict = spec.fit_batch(valid_prices, dt)
         # result_dict has keys -> (N,)-arrays where N = len(valid_tickers)
 
         # Assemble rows

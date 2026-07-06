@@ -19,8 +19,8 @@ import numpy as np
 # (prices_1d, dt) -> flat dict of scalar params/diagnostics
 FitFn = Callable[[np.ndarray, float], dict]
 
-# (list[prices_1d], ) -> dict of (N,)-arrays
-BatchFitFn = Callable[[list[np.ndarray]], dict]
+# (list[prices_1d], dt) -> dict of (N,)-arrays
+BatchFitFn = Callable[[list[np.ndarray], float], dict]
 
 
 @dataclass(frozen=True)
@@ -105,7 +105,7 @@ def _fit_rbergomi(prices: np.ndarray, dt: float) -> dict:
 # pad, call module fit_batch, return dict of (N,)-arrays
 
 
-def _batch_gbm(price_arrays: list[np.ndarray]) -> dict:
+def _batch_gbm(price_arrays: list[np.ndarray], dt: float) -> dict:
     """
     Batch adapter for GBM: prices -> log-returns -> fit_batch.
     """
@@ -113,11 +113,10 @@ def _batch_gbm(price_arrays: list[np.ndarray]) -> dict:
 
     returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
     returns, mask = common.pad_returns(returns_list)
-    dt = 1.0 / 252.0
     return gbm.fit_batch(returns, mask, dt)
 
 
-def _batch_garch(price_arrays: list[np.ndarray]) -> dict:
+def _batch_garch(price_arrays: list[np.ndarray], dt: float) -> dict:
     """
     Batch adapter for GARCH: prices -> log-returns -> fit_batch.
     """
@@ -125,11 +124,10 @@ def _batch_garch(price_arrays: list[np.ndarray]) -> dict:
 
     returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
     returns, mask = common.pad_returns(returns_list)
-    dt = 1.0 / 252.0
     return garch.fit_batch(returns, mask, dt)
 
 
-def _batch_heston_qmle(price_arrays: list[np.ndarray]) -> dict:
+def _batch_heston_qmle(price_arrays: list[np.ndarray], dt: float) -> dict:
     """
     Batch adapter for Heston QMLE: prices -> log-returns -> fit_batch.
 
@@ -141,11 +139,10 @@ def _batch_heston_qmle(price_arrays: list[np.ndarray]) -> dict:
 
     returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
     returns, mask = common.pad_returns(returns_list)
-    dt = 1.0 / 252.0
     return heston_qmle.fit_batch(returns, mask, dt)
 
 
-def _batch_ou(price_arrays: list[np.ndarray]) -> dict:
+def _batch_ou(price_arrays: list[np.ndarray], dt: float) -> dict:
     """
     Batch adapter for OU: prices -> log-prices as levels -> fit_batch.
 
@@ -167,13 +164,12 @@ def _batch_ou(price_arrays: list[np.ndarray]) -> dict:
     centers = np.array([lv.mean() for lv in levels_list], dtype=np.float64)
     centered = [lv - c for lv, c in zip(levels_list, centers)]
     levels, mask = common.pad_returns(centered)  # pad_returns works for any 1-D arrays
-    dt = 1.0 / 252.0
     out = ou.fit_batch(levels, mask, dt)
     out["theta"] = out["theta"] + centers
     return out
 
 
-def _batch_merton(price_arrays: list[np.ndarray]) -> dict:
+def _batch_merton(price_arrays: list[np.ndarray], dt: float) -> dict:
     """
     Batch adapter for Merton: prices -> log-returns -> fit_batch.
     """
@@ -181,11 +177,10 @@ def _batch_merton(price_arrays: list[np.ndarray]) -> dict:
 
     returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
     returns, mask = common.pad_returns(returns_list)
-    dt = 1.0 / 252.0
     return merton.fit_batch(returns, mask, dt)
 
 
-def _batch_rbergomi(price_arrays: list[np.ndarray]) -> dict:
+def _batch_rbergomi(price_arrays: list[np.ndarray], dt: float) -> dict:
     """
     Batch adapter for rough Bergomi: prices -> log-returns -> fit_batch.
     """
@@ -193,7 +188,6 @@ def _batch_rbergomi(price_arrays: list[np.ndarray]) -> dict:
 
     returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
     returns, mask = common.pad_returns(returns_list)
-    dt = 1.0 / 252.0
     return rbergomi.fit_batch(returns, mask, dt)
 
 

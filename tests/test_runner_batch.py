@@ -233,7 +233,7 @@ def test_batch_calibration_fallback_on_exception(tmp_path, store, monkeypatch):
         sigma = np.std(returns, ddof=1) / np.sqrt(dt)
         return {"mu": mu, "sigma": sigma, "converged": True}
 
-    def _batch_exploder(price_arrays: list[np.ndarray]) -> dict:
+    def _batch_exploder(price_arrays: list[np.ndarray], dt: float) -> dict:
         """Batch fit that always raises."""
         raise RuntimeError("batch exploder boom")
 

@@ -39,13 +39,13 @@ def _paths(n_assets=6, n=1200, seed=0):
 
 
 def test_parity_with_scipy_ou():
-    """Test parity with OUCalibrator.fit(method='exact_mle') on simulated OU paths."""
+    """Test parity with OUCalibrator.fit(method='discretization') on simulated OU paths."""
     paths_list = _paths()
     levels, mask = pad_levels(paths_list)
     out = bou.fit_batch(levels, mask, 1 / 252)
 
     for i, path in enumerate(paths_list):
-        ref = OUCalibrator(method='exact_mle').fit(path, dt=1 / 252)
+        ref = OUCalibrator(method='discretization').fit(path, dt=1 / 252)
         assert out["kappa"][i] == pytest.approx(ref.kappa, rel=1e-3, abs=1e-6)
         assert out["theta"][i] == pytest.approx(ref.theta, rel=1e-3, abs=1e-6)
         assert out["sigma"][i] == pytest.approx(ref.sigma, rel=1e-3, abs=1e-6)

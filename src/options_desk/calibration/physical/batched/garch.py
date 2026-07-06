@@ -240,6 +240,7 @@ def _fit_single_asset(returns, mask, dt, init_params_list):
     bic = k * jnp.log(n) - 2 * log_likelihood
 
     return {
+        "mu": mu,
         "omega": omega,
         "alpha": alpha,
         "beta": beta,
@@ -264,6 +265,7 @@ def fit_batch(returns, mask, dt):
 
     Returns:
         Dictionary with keys:
+            mu: (N,) mean return
             omega: (N,) constant term
             alpha: (N,) ARCH coefficient
             beta: (N,) GARCH coefficient
