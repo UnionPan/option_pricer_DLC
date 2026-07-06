@@ -6,6 +6,7 @@ calibration -> parquet results, with checkpoint/resume at model granularity.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,6 +57,82 @@ def _calibrate_one(model_name: str, ticker: str,
     except Exception as e:                                  # noqa: BLE001
         return {"ticker": ticker, "converged": False,
                 "error": f"{type(e).__name__}: {e}"}
+
+
+def _calibrate_batch(
+    model_name: str,
+    tickers: list[str],
+    prices_by_ticker: dict[str, np.ndarray | None],
+    dt: float,
+) -> list[dict]:
+    """
+    Batch calibration path: split into valid/invalid, call fit_batch once,
+    assemble rows. Falls back to per-asset joblib path if fit_batch raises.
+
+    Args:
+        model_name: Model to calibrate
+        tickers: Ordered list of tickers (universe order)
+        prices_by_ticker: Map of ticker -> prices (or None)
+        dt: Time increment
+
+    Returns:
+        List of dicts (one per ticker), same schema as _calibrate_one
+    """
+    spec = get_model(model_name)
+
+    # Split into valid (enough data) and invalid (insufficient data)
+    valid_tickers = []
+    valid_prices = []
+    invalid_rows = []
+
+    for ticker in tickers:
+        prices = prices_by_ticker[ticker]
+        if prices is None or len(prices) < spec.min_obs:
+            n = 0 if prices is None else len(prices)
+            invalid_rows.append({
+                "ticker": ticker,
+                "converged": False,
+                "error": f"insufficient data ({n} < {spec.min_obs} obs)",
+            })
+        else:
+            valid_tickers.append(ticker)
+            valid_prices.append(np.asarray(prices, dtype=np.float64))
+
+    # If no valid tickers, return only invalid rows
+    if not valid_tickers:
+        return invalid_rows
+
+    # Try batch calibration
+    try:
+        result_dict = spec.fit_batch(valid_prices)
+        # result_dict has keys -> (N,)-arrays where N = len(valid_tickers)
+
+        # Assemble rows
+        valid_rows = []
+        for i, ticker in enumerate(valid_tickers):
+            row = {"ticker": ticker, "error": ""}
+            for key, arr in result_dict.items():
+                # Extract scalar value for this ticker
+                val = arr[i]
+                # Convert numpy types to native Python types for dict
+                if isinstance(val, (np.integer, np.floating, np.bool_)):
+                    val = val.item()
+                row[key] = val
+            valid_rows.append(row)
+
+        # Combine valid and invalid rows in original ticker order
+        ticker_to_row = {r["ticker"]: r for r in valid_rows + invalid_rows}
+        return [ticker_to_row[t] for t in tickers]
+
+    except Exception as e:  # noqa: BLE001
+        # Batch calibration failed -> fall back to per-asset path
+        logger.warning(
+            "Batch calibration for model %s raised %s: %s; "
+            "falling back to per-asset joblib path",
+            model_name, type(e).__name__, e
+        )
+        # Return None to signal fallback to joblib
+        return None
 
 
 def run_calibration(
@@ -113,10 +190,28 @@ def run_calibration(
             continue
         logger.info("calibrating %s over %d names (n_jobs=%s)...",
                     model, len(universe), cfg.n_jobs)
-        rows = Parallel(n_jobs=cfg.n_jobs, prefer="processes")(
-            delayed(_calibrate_one)(model, t, prices_by_ticker[t], cfg.dt)
-            for t in universe.tickers
+
+        # Decide whether to use batch path or per-asset path
+        spec = get_model(model)
+        use_batch = (
+            spec.fit_batch is not None
+            and os.environ.get("OPTIONS_DESK_NO_BATCH") != "1"
         )
+
+        if use_batch:
+            logger.debug("Using batch calibration path for model %s", model)
+            rows = _calibrate_batch(model, universe.tickers, prices_by_ticker, cfg.dt)
+            # If batch calibration failed (returns None), fall back to joblib
+            if rows is None:
+                use_batch = False
+
+        if not use_batch:
+            logger.debug("Using per-asset joblib path for model %s", model)
+            rows = Parallel(n_jobs=cfg.n_jobs, prefer="processes")(
+                delayed(_calibrate_one)(model, t, prices_by_ticker[t], cfg.dt)
+                for t in universe.tickers
+            )
+
         df = pd.DataFrame(rows)
         df["sector"] = df["ticker"].map(universe.sectors).fillna("UNKNOWN")
         df["calibration_date"] = cal_date

@@ -11,7 +11,7 @@ names; the per-asset ``fit`` path here is the scipy reference route.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Callable
 
 import numpy as np
@@ -19,12 +19,16 @@ import numpy as np
 # (prices_1d, dt) -> flat dict of scalar params/diagnostics
 FitFn = Callable[[np.ndarray, float], dict]
 
+# (list[prices_1d], ) -> dict of (N,)-arrays
+BatchFitFn = Callable[[list[np.ndarray]], dict]
+
 
 @dataclass(frozen=True)
 class ModelSpec:
     name: str
     fit: FitFn
     min_obs: int = 60
+    fit_batch: BatchFitFn | None = None
 
 
 _REGISTRY: dict[str, ModelSpec] = {}
@@ -69,6 +73,114 @@ def _fit_heston_qmle(prices: np.ndarray, dt: float) -> dict:
     return _scalars(HestonQMLECalibrator(smooth_window=10).fit(prices, dt=dt))
 
 
-register_model(ModelSpec(name="gbm", fit=_fit_gbm, min_obs=60))
-register_model(ModelSpec(name="garch", fit=_fit_garch, min_obs=250))
-register_model(ModelSpec(name="heston_qmle", fit=_fit_heston_qmle, min_obs=60))
+def _fit_ou(prices: np.ndarray, dt: float) -> dict:
+    from ..physical.ou_calibrator import OUCalibrator
+    return _scalars(OUCalibrator(method='discretization').fit(prices, dt=dt))
+
+
+def _fit_merton(prices: np.ndarray, dt: float) -> dict:
+    from ..physical.merton_calibrator import MertonJumpCalibrator
+    result = MertonJumpCalibrator(k_max=5).fit(prices, dt=dt)
+    d = _scalars(result)
+    # Rename lambda_ to lam for consistency with batched version
+    if "lambda_" in d:
+        d["lam"] = d.pop("lambda_")
+    return d
+
+
+def _fit_rbergomi(prices: np.ndarray, dt: float) -> dict:
+    from ..physical.rough_bergomi_calibrator import RoughBergomiCalibrator
+    return _scalars(RoughBergomiCalibrator(window=20, max_lag=10).fit(prices, dt=dt))
+
+
+# Batch adapters: take list of price arrays, compute returns/levels internally,
+# pad, call module fit_batch, return dict of (N,)-arrays
+
+
+def _batch_gbm(price_arrays: list[np.ndarray]) -> dict:
+    """
+    Batch adapter for GBM: prices -> log-returns -> fit_batch.
+    """
+    from ..physical.batched import gbm, common
+
+    returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
+    returns, mask = common.pad_returns(returns_list)
+    dt = 1.0 / 252.0
+    return gbm.fit_batch(returns, mask, dt)
+
+
+def _batch_garch(price_arrays: list[np.ndarray]) -> dict:
+    """
+    Batch adapter for GARCH: prices -> log-returns -> fit_batch.
+    """
+    from ..physical.batched import garch, common
+
+    returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
+    returns, mask = common.pad_returns(returns_list)
+    dt = 1.0 / 252.0
+    return garch.fit_batch(returns, mask, dt)
+
+
+def _batch_heston_qmle(price_arrays: list[np.ndarray]) -> dict:
+    """
+    Batch adapter for Heston QMLE: prices -> log-returns -> fit_batch.
+
+    Note: Heston QMLE requires OHLC data; this adapter only has close prices.
+    We use close as a proxy for all OHLC values (suboptimal but matches
+    the per-asset path when only close is available).
+    """
+    from ..physical.batched import heston_qmle, common
+
+    returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
+    returns, mask = common.pad_returns(returns_list)
+    dt = 1.0 / 252.0
+    return heston_qmle.fit_batch(returns, mask, dt)
+
+
+def _batch_ou(price_arrays: list[np.ndarray]) -> dict:
+    """
+    Batch adapter for OU: prices -> log-prices as levels -> fit_batch.
+
+    OU is a mean-reverting process on levels, so we use log-prices as the
+    level series (not log-returns). This matches the scipy calibrator's
+    expectation that the input series is already the OU process realization.
+    """
+    from ..physical.batched import ou, common
+
+    # Use log-prices as the level series (OU process values)
+    levels_list = [np.log(prices) for prices in price_arrays]
+    levels, mask = common.pad_returns(levels_list)  # pad_returns works for any 1-D arrays
+    dt = 1.0 / 252.0
+    return ou.fit_batch(levels, mask, dt)
+
+
+def _batch_merton(price_arrays: list[np.ndarray]) -> dict:
+    """
+    Batch adapter for Merton: prices -> log-returns -> fit_batch.
+    """
+    from ..physical.batched import merton, common
+
+    returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
+    returns, mask = common.pad_returns(returns_list)
+    dt = 1.0 / 252.0
+    return merton.fit_batch(returns, mask, dt)
+
+
+def _batch_rbergomi(price_arrays: list[np.ndarray]) -> dict:
+    """
+    Batch adapter for rough Bergomi: prices -> log-returns -> fit_batch.
+    """
+    from ..physical.batched import rbergomi, common
+
+    returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
+    returns, mask = common.pad_returns(returns_list)
+    dt = 1.0 / 252.0
+    return rbergomi.fit_batch(returns, mask, dt)
+
+
+register_model(ModelSpec(name="gbm", fit=_fit_gbm, min_obs=60, fit_batch=_batch_gbm))
+register_model(ModelSpec(name="garch", fit=_fit_garch, min_obs=250, fit_batch=_batch_garch))
+register_model(ModelSpec(name="heston_qmle", fit=_fit_heston_qmle, min_obs=60, fit_batch=_batch_heston_qmle))
+register_model(ModelSpec(name="ou", fit=_fit_ou, min_obs=60, fit_batch=_batch_ou))
+register_model(ModelSpec(name="merton", fit=_fit_merton, min_obs=250, fit_batch=_batch_merton))
+register_model(ModelSpec(name="rbergomi", fit=_fit_rbergomi, min_obs=250, fit_batch=_batch_rbergomi))
