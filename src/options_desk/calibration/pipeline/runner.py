@@ -106,20 +106,38 @@ def _build_ohlc_data(
             ohlc_by_ticker[t] = None
             continue
 
-        # Compute adjustment factor: adj_close / close (guard zeros/NaN)
-        close_vals = df["close"].values
-        adj_close_vals = df["adj_close"].values
+        open_vals = df["open"].to_numpy(dtype=np.float64)
+        high_vals = df["high"].to_numpy(dtype=np.float64)
+        low_vals = df["low"].to_numpy(dtype=np.float64)
+        close_vals = df["close"].to_numpy(dtype=np.float64)
+        adj_close_vals = df["adj_close"].to_numpy(dtype=np.float64)
 
-        # Avoid division by zero or NaN
-        factor = np.ones_like(close_vals, dtype=np.float64)
-        valid_mask = (close_vals > 0) & np.isfinite(close_vals) & np.isfinite(adj_close_vals)
-        factor[valid_mask] = adj_close_vals[valid_mask] / close_vals[valid_mask]
+        # A bar is valid only if ALL OHLC values and adjustment-factor inputs
+        # are finite AND close > 0 (division guard). Invalid bars are DROPPED
+        # from all four series, so the arrays handed to the batch adapter are
+        # equal-length and NaN-free — pad_returns then yields identical masks
+        # for open/high/low/close. Bars with close <= 0 or NaN inputs are never
+        # silently given factor = 1.
+        valid_bars = (
+            np.isfinite(open_vals)
+            & np.isfinite(high_vals)
+            & np.isfinite(low_vals)
+            & np.isfinite(close_vals)
+            & np.isfinite(adj_close_vals)
+            & (close_vals > 0)
+        )
 
-        # Scale OHLC by adjustment factor
-        ohlc_dict = {}
-        for col in ["open", "high", "low", "close"]:
-            scaled = df[col].values * factor
-            ohlc_dict[col] = scaled.astype(np.float64)
+        # Adjustment factor on valid bars only: adj_close / close
+        factor = adj_close_vals[valid_bars] / close_vals[valid_bars]
+
+        # Scale OHLC by adjustment factor (GK ratios unchanged; close-to-close
+        # returns become dividend/split-adjusted)
+        ohlc_dict = {
+            "open": open_vals[valid_bars] * factor,
+            "high": high_vals[valid_bars] * factor,
+            "low": low_vals[valid_bars] * factor,
+            "close": close_vals[valid_bars] * factor,
+        }
 
         ohlc_by_ticker[t] = ohlc_dict
 
@@ -249,7 +267,8 @@ def _calibrate_batch_ohlc(
             })
             continue
 
-        # Check for NaN/inf in OHLC data
+        # Defensive check for NaN/inf: _build_ohlc_data drops invalid bars,
+        # so this should never trigger for data assembled by the runner.
         has_invalid = False
         for col in ["open", "high", "low", "close"]:
             if not np.all(np.isfinite(ohlc[col])):
@@ -568,17 +587,26 @@ def run_calibration(
         logger.info("calibrating %s over %d names (n_jobs=%s)...",
                     model, len(universe), cfg.n_jobs)
 
-        # Decide whether to use batch path or per-asset path
+        # Decide whether to use batch path or per-asset path.
+        # For needs_ohlc models the batch path is MANDATORY: there is no
+        # per-asset scipy fallback, so OPTIONS_DESK_NO_BATCH is ignored.
         spec = get_model(model)
         use_batch = (
             spec.fit_batch is not None
-            and os.environ.get("OPTIONS_DESK_NO_BATCH") != "1"
+            and (spec.needs_ohlc
+                 or os.environ.get("OPTIONS_DESK_NO_BATCH") != "1")
         )
 
         if use_batch:
             logger.info("Using batch calibration path for model %s", model)
 
             if spec.needs_ohlc:
+                if os.environ.get("OPTIONS_DESK_NO_BATCH") == "1":
+                    logger.info(
+                        "OPTIONS_DESK_NO_BATCH=1 ignored for OHLC model %s: "
+                        "batch path is mandatory (no per-asset fallback)",
+                        model,
+                    )
                 # Build OHLC data for needs_ohlc models
                 ohlc_by_ticker = _build_ohlc_data(store, universe.tickers, start, end)
                 rows = _calibrate_batch_ohlc(

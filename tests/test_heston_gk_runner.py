@@ -245,19 +245,31 @@ def test_heston_gk_adjustment_invariance(tmp_path, ohlc_store):
 
 def test_heston_gk_missing_ohlc_produces_unconverged_row(tmp_path):
     """
-    Test (c): A ticker with NaN high/low produces converged=False row, run completes.
+    Test (c): A ticker with NaN high/low produces converged=False row, run
+    completes, and its presence does NOT change other tickers' params
+    (mask isolation).
     """
-    # Create a store with one ticker having NaN high/low
-    def make_nan_ohlc_frame():
+    # BAD: ALL high/low NaN -> every bar invalid -> dropped -> insufficient data
+    def make_all_nan_ohlc_frame():
         df = _heston_ohlc_frame(n=700, seed=0, substeps=32)
-        # Set half of high/low to NaN
+        df["high"] = np.nan
+        df["low"] = np.nan
+        return df
+
+    # PARTIAL: every other bar has NaN high/low -> those bars are dropped,
+    # remaining ~350 valid bars still calibrate (participates in the batch
+    # with a shorter, NaN-free series -> exercises padding/mask isolation)
+    def make_partial_nan_ohlc_frame():
+        df = _heston_ohlc_frame(n=700, seed=2, substeps=32)
         df.loc[df.index[::2], "high"] = np.nan
         df.loc[df.index[::2], "low"] = np.nan
         return df
 
+    good_frame = _heston_ohlc_frame(n=700, seed=1, substeps=32)
     frames = {
-        "GOOD": _heston_ohlc_frame(n=700, seed=1, substeps=32),
-        "BAD": make_nan_ohlc_frame(),
+        "GOOD": good_frame,
+        "PARTIAL": make_partial_nan_ohlc_frame(),
+        "BAD": make_all_nan_ohlc_frame(),
     }
 
     def fake_fetcher(tickers, start, end):
@@ -267,8 +279,8 @@ def test_heston_gk_missing_ohlc_produces_unconverged_row(tmp_path):
 
     uni = Universe(
         name="test_nan",
-        tickers=["GOOD", "BAD"],
-        sectors={"GOOD": "Tech", "BAD": "Tech"},
+        tickers=["GOOD", "PARTIAL", "BAD"],
+        sectors={"GOOD": "Tech", "PARTIAL": "Tech", "BAD": "Tech"},
     )
 
     cfg = RunConfig(
@@ -288,8 +300,71 @@ def test_heston_gk_missing_ohlc_produces_unconverged_row(tmp_path):
     assert good_row["converged"]
     assert good_row["error"] == ""
 
-    # BAD should not converge (NaN OHLC data)
+    # PARTIAL should converge on its valid (NaN-free) bars only
+    partial_row = df[df["ticker"] == "PARTIAL"].iloc[0]
+    assert partial_row["converged"]
+    assert partial_row["error"] == ""
+    for col in ["kappa", "theta", "sigma_v"]:
+        assert np.isfinite(partial_row[col])
+
+    # BAD should not converge (all bars invalid -> insufficient data)
     bad_row = df[df["ticker"] == "BAD"].iloc[0]
     assert not bad_row["converged"]
     # Error message should indicate the problem
     assert bad_row["error"] != ""
+
+    # Mask isolation: run GOOD alone -> params must be unchanged by the
+    # presence of the NaN tickers in the batch.
+    def fetch_good_only(tickers, start, end):
+        return {t: frames[t] for t in tickers if t == "GOOD"}
+
+    store_solo = PriceStore(tmp_path / "lake_solo", fetcher=fetch_good_only)
+    uni_solo = Universe(name="test_solo", tickers=["GOOD"],
+                        sectors={"GOOD": "Tech"})
+    cfg_solo = RunConfig(
+        universe="ignored",
+        models=["heston_qmle_gk"],
+        years=2.5,
+        n_jobs=1,
+        out_root=tmp_path / "runs_solo",
+        run_id="solo",
+        end="2025-01-31",
+    )
+    run_dir_solo = run_calibration(cfg_solo, store_solo, universe=uni_solo)
+    df_solo = load_model_results(run_dir_solo, "heston_qmle_gk")
+    good_solo = df_solo[df_solo["ticker"] == "GOOD"].iloc[0]
+
+    for param in ["kappa", "theta", "sigma_v", "rho", "mu", "v0"]:
+        assert np.isclose(good_row[param], good_solo[param], rtol=1e-6), (
+            f"GOOD {param} changed due to NaN tickers in batch: "
+            f"batch={good_row[param]}, solo={good_solo[param]}"
+        )
+
+
+def test_heston_gk_no_batch_env_var_ignored(tmp_path, ohlc_store, monkeypatch):
+    """
+    OPTIONS_DESK_NO_BATCH=1 must be ignored for needs_ohlc models: the batch
+    path is mandatory (no per-asset fallback), so the run still produces
+    converged GK rows instead of joblib NotImplementedError rows.
+    """
+    monkeypatch.setenv("OPTIONS_DESK_NO_BATCH", "1")
+
+    cfg = RunConfig(
+        universe="ignored",
+        models=["heston_qmle_gk"],
+        years=2.5,
+        n_jobs=1,
+        out_root=tmp_path / "runs_no_batch",
+        run_id="no_batch",
+        end="2025-01-31",
+    )
+    run_dir = run_calibration(cfg, ohlc_store, universe=UNI)
+    df = load_model_results(run_dir, "heston_qmle_gk")
+
+    good_tickers = ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"]
+    ok = df[df["ticker"].isin(good_tickers)]
+    assert ok["converged"].all()
+    assert (ok["error"] == "").all()
+    for col in ["kappa", "theta", "sigma_v"]:
+        assert col in df.columns
+        assert np.isfinite(ok[col]).all()
