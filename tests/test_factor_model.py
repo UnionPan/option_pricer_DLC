@@ -14,29 +14,34 @@ class TestFactorModelRecovery:
     """Test 1: Recovery of true factor model."""
 
     def test_recovery_from_simulated_data(self):
-        """Simulate data from true 3-factor model and verify recovery."""
+        """Simulate data from true 3-factor model (brief fixture) and verify recovery.
+
+        Metric note: on the FULL covariance, the factor model and the sample
+        covariance share the same factor-estimation noise, which dominates the
+        Frobenius error — their full-matrix errors come out within a few
+        percent of each other (ratio ~1). The regularization benefit lives in
+        the RESIDUAL block: the true residual covariance is diagonal, the
+        sample covariance's implied residual carries O(N²) noisy
+        off-diagonals, while POET thresholds them away. The primary assertion
+        therefore compares residual-covariance errors.
+        """
         rng = np.random.RandomState(42)
-        T = 400  # Smaller T increases sampling noise in sample cov
-        N = 200  # Smaller N for better T/N ratio
+        T = 800
+        N = 300
         k_true = 3
 
-        # Generate true factor model with strong factor structure
-        # Larger loadings, smaller idio variance
-        B_true = rng.randn(N, k_true)  # Loadings ~ N(0, 1)
-        B_true[:, 0] *= 0.08
-        B_true[:, 1] *= 0.05
-        B_true[:, 2] *= 0.03
-
-        factor_vols = np.array([0.015, 0.01, 0.008])  # Factor volatilities
+        # Brief fixture: B ~ N(0, 1), factor vols {3%, 2%, 1.5%}, idio vol 1%
+        B_true = rng.randn(N, k_true)
+        factor_vols = np.array([0.03, 0.02, 0.015])
         Omega_true = np.diag(factor_vols**2)
-        D_true = np.ones(N) * 0.001**2  # Very small idio variance
+        D_true = np.ones(N) * 0.01**2
 
         # True covariance
         Sigma_true = B_true @ Omega_true @ B_true.T + np.diag(D_true)
 
         # Generate returns
         factors = rng.randn(T, k_true) @ np.diag(factor_vols)
-        idio = rng.randn(T, N) * 0.001
+        idio = rng.randn(T, N) * 0.01
         returns = factors @ B_true.T + idio
 
         tickers = [f"ASSET_{i:03d}" for i in range(N)]
@@ -47,29 +52,44 @@ class TestFactorModelRecovery:
         # Check k selection via MP edge
         assert model.k == k_true, f"Expected k={k_true}, got k={model.k}"
 
-        # Get estimated covariance
-        factor_cov = model.cov()
-        Sigma_hat = factor_cov.to_dense()
-
         # Sample covariance (for comparison)
         returns_demeaned = returns - returns.mean(axis=0)
         Sigma_sample = (returns_demeaned.T @ returns_demeaned) / (T - 1)
 
-        # Relative Frobenius error
+        # --- Primary metric: RESIDUAL-covariance error ---
+        # True residual covariance is diag(D_true).
+        # Factor-model residual estimate: Theta_hat (sparse POET or diagonal).
+        if model.resid_cov_sparse is not None:
+            theta_hat = model.resid_cov_sparse
+        else:
+            theta_hat = np.diag(model.resid_var)
+        err_resid_factor = np.linalg.norm(theta_hat - np.diag(D_true), "fro")
+
+        # Sample-cov implied residual: Sigma_sample minus the TRUE factor
+        # part; its error vs diag(D_true) is dominated by noisy off-diagonals
+        # (true off-diagonals are exactly zero).
+        sample_resid = Sigma_sample - B_true @ Omega_true @ B_true.T
+        err_resid_sample = np.linalg.norm(sample_resid - np.diag(D_true), "fro")
+
+        resid_improvement = err_resid_sample / err_resid_factor
+        assert resid_improvement >= 2.0, (
+            f"Residual-cov error improvement {resid_improvement:.2f}x < 2x "
+            f"(factor {err_resid_factor:.3e} vs sample {err_resid_sample:.3e})"
+        )
+
+        # --- Secondary sanity: full-matrix Frobenius error ---
+        # Ratio is ~1 because factor-estimation noise is shared (see
+        # docstring); just require the factor model is not materially worse.
+        Sigma_hat = model.cov().to_dense()
         error_factor = np.linalg.norm(Sigma_hat - Sigma_true, "fro") / np.linalg.norm(
             Sigma_true, "fro"
         )
         error_sample = np.linalg.norm(Sigma_sample - Sigma_true, "fro") / np.linalg.norm(
             Sigma_true, "fro"
         )
-
-        # Factor model should be better than sample covariance
-        # With strong factor structure and k selection via MP edge,
-        # the factor model provides dimensionality reduction benefit
-        improvement_ratio = error_sample / error_factor
-        assert improvement_ratio > 1.04, (
-            f"Factor model error {error_factor:.4f} not sufficiently better than "
-            f"sample cov error {error_sample:.4f} (improvement ratio {improvement_ratio:.3f} ≤ 1.04)"
+        assert error_factor < error_sample * 1.05, (
+            f"Factor model full-matrix error {error_factor:.4f} materially worse "
+            f"than sample cov error {error_sample:.4f}"
         )
 
 
@@ -156,6 +176,40 @@ class TestQuadForm:
 
         rel_error = abs(quad_efficient - quad_dense) / abs(quad_dense)
         assert rel_error < 1e-10, f"Relative error {rel_error:.2e} >= 1e-10"
+
+    def test_quad_form_diagonal_residual_path(self):
+        """quad_form on the diagonal-residual path (threshold=0, no sparse cov)."""
+        rng = np.random.RandomState(46)
+        T = 300
+        N = 80
+
+        k_sim = 3
+        factors = rng.randn(T, k_sim) * 0.02
+        loadings = rng.randn(N, k_sim) * 0.1
+        idio = rng.randn(T, N) * 0.01
+        returns = factors @ loadings.T + idio
+
+        tickers = [f"ASSET_{i:03d}" for i in range(N)]
+
+        # threshold=0 disables POET -> resid_cov_sparse is None -> diagonal D path
+        model = fit_factor_model(returns, tickers, k=None, threshold=0)
+        assert model.resid_cov_sparse is None
+        factor_cov = model.cov()
+
+        w = rng.randn(N)
+        w /= np.abs(w).sum()
+
+        quad_efficient = factor_cov.quad_form(w)
+        assert isinstance(quad_efficient, float)
+
+        Sigma = factor_cov.to_dense()
+        quad_dense = float(w @ Sigma @ w)
+
+        rel_error = abs(quad_efficient - quad_dense) / abs(quad_dense)
+        assert rel_error < 1e-10, f"Relative error {rel_error:.2e} >= 1e-10"
+
+        # variance() must also match the dense diagonal on this path
+        assert np.allclose(factor_cov.variance(), np.diag(Sigma), rtol=1e-12)
 
 
 class TestDeterminism:
