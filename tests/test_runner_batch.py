@@ -115,6 +115,89 @@ def test_batch_vs_per_asset_produces_same_results(tmp_path, store, monkeypatch):
         )
 
 
+def _ou_frame(n=800, seed=0, kappa=15.0, theta=None, sigma=0.4):
+    """Generate synthetic mean-reverting prices: OU process in log-price."""
+    rng = np.random.default_rng(seed)
+    dt = 1.0 / 252.0
+    theta = np.log(100.0) if theta is None else theta
+    b = np.exp(-kappa * dt)
+    noise_sd = sigma * np.sqrt((1.0 - np.exp(-2.0 * kappa * dt)) / (2.0 * kappa))
+    x = np.empty(n)
+    x[0] = theta
+    z = rng.standard_normal(n - 1)
+    for i in range(1, n):
+        x[i] = theta + (x[i - 1] - theta) * b + noise_sd * z[i - 1]
+    close = pd.Series(np.exp(x), index=pd.bdate_range("2022-01-03", periods=n))
+    df = pd.DataFrame(
+        {c: close for c in ["open", "high", "low", "close", "adj_close"]}
+    )
+    df["volume"] = 1e6
+    return df
+
+
+@pytest.fixture()
+def ou_store(tmp_path):
+    """Synthetic mean-reverting price store: 3 good tickers + 1 dead ticker."""
+    frames = {t: _ou_frame(seed=i) for i, t in enumerate(["AAA", "BBB", "CCC"])}
+    frames["DEAD"] = _ou_frame(n=30, seed=3)
+
+    def fake_fetcher(tickers, start, end):
+        return {t: frames[t] for t in tickers if t in frames}
+
+    return PriceStore(tmp_path / "lake", fetcher=fake_fetcher)
+
+
+def test_ou_batch_vs_per_asset(tmp_path, ou_store, monkeypatch):
+    """
+    OU: batch path (log-price levels, JAX AR(1)) and per-asset scipy fallback
+    must agree on kappa/theta/sigma within rel 1e-3.
+
+    Regression test: the scipy fallback previously received RAW prices while
+    the batch adapter used log-prices as the OU level series, so the two
+    paths silently produced different parameters.
+    """
+    cfg_batch = RunConfig(
+        universe="ignored",
+        models=["ou"],
+        years=3.0,
+        n_jobs=1,
+        out_root=tmp_path / "runs_ou_batch",
+        run_id="ou_batch",
+        end="2025-01-31",
+    )
+    run_dir_batch = run_calibration(cfg_batch, ou_store, universe=UNI)
+    df_batch = load_model_results(run_dir_batch, "ou")
+
+    monkeypatch.setenv("OPTIONS_DESK_NO_BATCH", "1")
+    cfg_no_batch = RunConfig(
+        universe="ignored",
+        models=["ou"],
+        years=3.0,
+        n_jobs=1,
+        out_root=tmp_path / "runs_ou_no_batch",
+        run_id="ou_no_batch",
+        end="2025-01-31",
+    )
+    run_dir_no_batch = run_calibration(cfg_no_batch, ou_store, universe=UNI)
+    df_no_batch = load_model_results(run_dir_no_batch, "ou")
+
+    # Same converged set
+    assert set(df_batch[df_batch["converged"]]["ticker"]) == set(
+        df_no_batch[df_no_batch["converged"]]["ticker"]
+    )
+    assert set(df_batch[df_batch["converged"]]["ticker"]) == {"AAA", "BBB", "CCC"}
+
+    # kappa/theta/sigma agree within rel 1e-3
+    for ticker in ["AAA", "BBB", "CCC"]:
+        row_b = df_batch[df_batch["ticker"] == ticker].iloc[0]
+        row_s = df_no_batch[df_no_batch["ticker"] == ticker].iloc[0]
+        for param in ["kappa", "theta", "sigma"]:
+            assert np.isclose(row_b[param], row_s[param], rtol=1e-3), (
+                f"{ticker}: {param} mismatch batch={row_b[param]}, "
+                f"per-asset={row_s[param]}"
+            )
+
+
 def test_batch_invalid_tickers_get_insufficient_data_rows(tmp_path, store):
     """
     Test (b): Invalid tickers get insufficient-data rows in batch mode.
@@ -154,17 +237,19 @@ def test_batch_calibration_fallback_on_exception(tmp_path, store, monkeypatch):
         """Batch fit that always raises."""
         raise RuntimeError("batch exploder boom")
 
-    # Register the exploder model
+    # Register the exploder model (name distinct from test_runner.py's
+    # "exploder": the registry is process-global and rejects duplicates)
     register_model(
         ModelSpec(
-            name="exploder", fit=_fit_exploder, min_obs=60, fit_batch=_batch_exploder
+            name="batch_exploder", fit=_fit_exploder, min_obs=60,
+            fit_batch=_batch_exploder,
         )
     )
 
     # Run calibration (should fall back to per-asset path)
     cfg = RunConfig(
         universe="ignored",
-        models=["exploder"],
+        models=["batch_exploder"],
         years=3.0,
         n_jobs=1,
         out_root=tmp_path / "runs_fallback",
@@ -172,7 +257,7 @@ def test_batch_calibration_fallback_on_exception(tmp_path, store, monkeypatch):
         end="2025-01-31",
     )
     run_dir = run_calibration(cfg, store, universe=UNI)
-    df = load_model_results(run_dir, "exploder")
+    df = load_model_results(run_dir, "batch_exploder")
 
     # Should have results for all tickers
     assert set(df["ticker"]) == {"AAA", "BBB", "CCC", "DEAD"}

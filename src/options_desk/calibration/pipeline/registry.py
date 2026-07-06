@@ -74,8 +74,16 @@ def _fit_heston_qmle(prices: np.ndarray, dt: float) -> dict:
 
 
 def _fit_ou(prices: np.ndarray, dt: float) -> dict:
+    """
+    Per-asset OU fit on LOG-PRICE levels (matches the batch adapter).
+
+    The OU level series is log(prices), not raw prices. method='discretization'
+    (AR(1) OLS, ddof=2 residual variance) is the estimator that batched/ou.py
+    implements in closed form, so batch and fallback paths agree.
+    """
     from ..physical.ou_calibrator import OUCalibrator
-    return _scalars(OUCalibrator(method='discretization').fit(prices, dt=dt))
+    levels = np.log(prices)
+    return _scalars(OUCalibrator(method='discretization').fit(levels, dt=dt))
 
 
 def _fit_merton(prices: np.ndarray, dt: float) -> dict:
@@ -142,16 +150,27 @@ def _batch_ou(price_arrays: list[np.ndarray]) -> dict:
     Batch adapter for OU: prices -> log-prices as levels -> fit_batch.
 
     OU is a mean-reverting process on levels, so we use log-prices as the
-    level series (not log-returns). This matches the scipy calibrator's
-    expectation that the input series is already the OU process realization.
+    level series (not log-returns). This matches the per-asset fallback
+    (_fit_ou), which fits the scipy calibrator on np.log(prices).
+
+    Each asset's level series is centered (mean subtracted) before padding:
+    the batched AR(1) OLS runs in float32 and its normal-equation determinant
+    n*sum(X^2) - sum(X)^2 cancels catastrophically for un-centered levels.
+    Centering is exact for AR(1) with intercept — b, kappa, sigma and the
+    log-likelihood are translation-invariant; only theta shifts, and the
+    center is added back below.
     """
     from ..physical.batched import ou, common
 
-    # Use log-prices as the level series (OU process values)
+    # Log-prices as the level series (OU process values), centered per asset
     levels_list = [np.log(prices) for prices in price_arrays]
-    levels, mask = common.pad_returns(levels_list)  # pad_returns works for any 1-D arrays
+    centers = np.array([lv.mean() for lv in levels_list], dtype=np.float64)
+    centered = [lv - c for lv, c in zip(levels_list, centers)]
+    levels, mask = common.pad_returns(centered)  # pad_returns works for any 1-D arrays
     dt = 1.0 / 252.0
-    return ou.fit_batch(levels, mask, dt)
+    out = ou.fit_batch(levels, mask, dt)
+    out["theta"] = out["theta"] + centers
+    return out
 
 
 def _batch_merton(price_arrays: list[np.ndarray]) -> dict:
