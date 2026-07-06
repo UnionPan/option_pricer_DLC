@@ -199,14 +199,14 @@ def run_calibration(
         )
 
         if use_batch:
-            logger.debug("Using batch calibration path for model %s", model)
+            logger.info("Using batch calibration path for model %s", model)
             rows = _calibrate_batch(model, universe.tickers, prices_by_ticker, cfg.dt)
             # If batch calibration failed (returns None), fall back to joblib
             if rows is None:
                 use_batch = False
 
         if not use_batch:
-            logger.debug("Using per-asset joblib path for model %s", model)
+            logger.info("Using per-asset joblib path for model %s", model)
             rows = Parallel(n_jobs=cfg.n_jobs, prefer="processes")(
                 delayed(_calibrate_one)(model, t, prices_by_ticker[t], cfg.dt)
                 for t in universe.tickers
