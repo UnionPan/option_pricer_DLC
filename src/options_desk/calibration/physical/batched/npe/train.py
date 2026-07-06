@@ -128,13 +128,8 @@ def train_mdn(
         state = state.apply_gradients(grads=grads)
         return state, loss
 
-    # Validation loss
-    @jax.jit
-    def val_loss(params, s, z):
-        return mdn_nll(params, state.apply_fn, s, z)
-
     # Training loop
-    key, subkey = jax.random.split(key)
+    n_batches = (n_train + batch_size - 1) // batch_size
     for epoch in range(epochs):
         # Shuffle training data
         key, subkey = jax.random.split(key)
@@ -143,22 +138,13 @@ def train_mdn(
         z_train_shuffled = z_train[perm]
 
         # Batch training
-        n_batches = (n_train + batch_size - 1) // batch_size
-        epoch_loss = 0.0
-
         for i in range(n_batches):
             start = i * batch_size
             end = min(start + batch_size, n_train)
             s_batch = s_train_shuffled[start:end]
             z_batch = z_train_shuffled[start:end]
 
-            state, loss = train_step(state, s_batch, z_batch)
-            epoch_loss += loss
-
-        # Validation loss (optional, for monitoring)
-        if epoch % 10 == 0 or epoch == epochs - 1:
-            v_loss = val_loss(state.params, s_val, z_val)
-            # Silently computed, not printed (can be logged if needed)
+            state, _ = train_step(state, s_batch, z_batch)
 
     # Return trained model
     config = {

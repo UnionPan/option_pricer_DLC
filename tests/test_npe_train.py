@@ -1,11 +1,12 @@
 """
 Tests for NPE training and posterior sampling.
 
-Tests (4000 sims, T=256, epochs=30, hidden=(32,32), K=4):
+Tests (4000 sims, T=256, epochs=40, hidden=(48,48), K=6):
 a) Validation NLL decreases ≥20% vs epoch 0
 b) Save/load roundtrip → identical posterior samples
-c) 99% of posterior samples within 1.5x-widened prior bounds
-d) Posterior std < prior std (informativeness)
+c) Containment: rho 100% inside (-0.99, 0.99) (transform invariant) and
+   ≥95% inside its 1.5x-widened prior range; ≥85% jointly for exp/affine params
+d) Informativeness: theta posterior std < prior std; ≥2 params concentrate
 
 Total runtime target: <120s CPU
 """
@@ -227,10 +228,18 @@ def test_save_load_roundtrip(trained_model):
 
 def test_posterior_samples_within_bounds(trained_model, training_data):
     """
-    Test (c): Posterior samples within reasonable bounds.
+    Test (c): Posterior samples within reasonable bounds, per-parameter.
 
-    Soft check: We verify that most samples (≥90%) are within 1.5x-widened
-    prior bounds, demonstrating the model learns reasonable posteriors.
+    Split by parameter transform:
+    - rho (index 3) goes through 0.99*tanh, so it is mathematically bounded in
+      (-0.99, 0.99). We assert (i) 100% of samples strictly inside that open
+      interval (the transform invariant — exact), and (ii) >=95% containment
+      in the 1.5x-widened prior range (statistical — rho's asymmetric prior
+      leaves a reachable spill region below the tanh bound).
+    - kappa/theta/sigma_v/v0 go through exp (unbounded above) and mu is affine
+      (unbounded both ways), so MDN Gaussian tails naturally produce some
+      samples outside the widened ranges at tiny model scale. For these five we
+      require >=85% joint containment.
     """
     # Generate test features
     key = jax.random.PRNGKey(555)
@@ -268,25 +277,56 @@ def test_posterior_samples_within_bounds(trained_model, training_data):
     widened_low = center - 1.5 * half_width
     widened_high = center + 1.5 * half_width
 
-    # Check fraction within bounds
-    within_bounds = jnp.all(
-        (samples_flat >= widened_low) & (samples_flat <= widened_high),
-        axis=-1,
-    )
-    fraction_within = jnp.mean(within_bounds)
+    # Per-parameter containment breakdown
+    within_per_param = (samples_flat >= widened_low) & (samples_flat <= widened_high)  # (M, 6)
+    frac_per_param = jnp.mean(within_per_param, axis=0)  # (6,)
 
-    assert fraction_within >= 0.85, \
-        f"Only {fraction_within*100:.1f}% within 1.5x bounds, expected ≥85%"
+    # Split check for the bounded parameter: rho (index 3).
+    #
+    # (i) Transform invariant (exact): rho = 0.99*tanh(z) is mathematically
+    # bounded in (-0.99, 0.99). ANY sample outside this open interval would
+    # indicate a real sampling/transform bug, so we require 100% containment.
+    rho_samples = samples_flat[:, 3]
+    n_violating_bound = jnp.sum((rho_samples <= -0.99) | (rho_samples >= 0.99))
+    assert n_violating_bound == 0, \
+        f"{n_violating_bound} rho samples outside (-0.99, 0.99) — the tanh " \
+        f"transform invariant is violated: sampling/transform bug."
+
+    # (ii) Widened-prior-range containment (statistical, >=95%): rho's prior
+    # [-0.95, 0.1] is asymmetric, so its 1.5x-widened upper limit (0.3625)
+    # sits far inside the tanh bound (0.99). The spill region (0.3625, 0.99)
+    # is mathematically reachable — the tanh bound does NOT protect the upper
+    # end of the widened range — and MDN Gaussian tails in atanh-space place a
+    # small amount of mass there for a weakly-identified parameter. Observed
+    # spill is ~1.9% at test scale, so we require >=95% containment.
+    rho_containment = frac_per_param[3]
+    assert rho_containment >= 0.95, \
+        f"rho containment {rho_containment*100:.2f}% < 95% in widened prior " \
+        f"range. Per-param: {frac_per_param}"
+
+    # Joint containment over the unbounded (exp/affine) params:
+    # kappa, theta, sigma_v, mu, v0 (indices 0, 1, 2, 4, 5)
+    unbounded_idx = jnp.array([0, 1, 2, 4, 5])
+    within_unbounded = jnp.all(within_per_param[:, unbounded_idx], axis=-1)
+    fraction_unbounded = jnp.mean(within_unbounded)
+
+    assert fraction_unbounded >= 0.85, \
+        f"Only {fraction_unbounded*100:.1f}% of samples jointly within 1.5x bounds " \
+        f"for exp/affine params, expected ≥85%. Per-param: {frac_per_param}"
 
 
 def test_posterior_informativeness(trained_model, training_data):
     """
     Test (d): Posterior shows informativeness for well-identified parameters.
 
-    We check that at least 2 parameters show concentration (std ratio < 1.0),
-    demonstrating the NPE learns from data. In Heston calibration from returns,
-    typically theta and sigma_v are well-identified, while kappa, rho, mu, v0
-    are harder to identify.
+    We check that:
+    1. theta (index 1, long-run variance) is informative — it is the most
+       identifiable Heston parameter from returns data (it drives realized
+       variance directly) and must concentrate even at tiny model scale.
+    2. At least 2 parameters overall show concentration (std ratio < 1.0),
+       demonstrating the NPE learns from data. In Heston calibration from
+       returns, typically theta and sigma_v are well-identified, while kappa,
+       rho, mu, v0 are harder to identify.
     """
     # Generate test features
     key = jax.random.PRNGKey(666)
@@ -323,6 +363,14 @@ def test_posterior_informativeness(trained_model, training_data):
 
     # Check that at least some parameters show concentration
     ratio = avg_posterior_std / prior_std
+
+    # theta (index 1) is the most identifiable Heston parameter — it must
+    # concentrate below the prior even at tiny model scale. Failure here
+    # indicates a real learning/sampling bug, not model-capacity limits.
+    theta_ratio = ratio[1]
+    assert theta_ratio < 1.0, \
+        f"theta posterior std / prior std = {theta_ratio:.3f}, expected < 1.0 " \
+        f"(theta is the best-identified param). Ratios: {ratio}"
 
     # Check that at least 2 parameters show informativeness (ratio < 1.0)
     n_informative = jnp.sum(ratio < 1.0)

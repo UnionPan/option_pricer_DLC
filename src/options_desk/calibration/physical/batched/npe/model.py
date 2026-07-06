@@ -110,7 +110,7 @@ def mdn_nll(params, apply_fn, s, z):
     mahalanobis = (z_centered / jnp.exp(log_scales)) ** 2  # (B, K, 6)
 
     # Sum over dimensions to get log density per component
-    log_probs = const * 6 - 0.5 * jnp.sum(log_scales_2 + mahalanobis, axis=-1)  # (B, K)
+    log_probs = const * z.shape[-1] - 0.5 * jnp.sum(log_scales_2 + mahalanobis, axis=-1)  # (B, K)
 
     # Combine with mixture weights: log p(z|s) = logsumexp_k [log π_k + log p_k(z)]
     log_likelihood = jax.nn.logsumexp(log_mix_weights + log_probs, axis=-1)  # (B,)
