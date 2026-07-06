@@ -238,6 +238,37 @@ def _batch_heston_qmle_gk(ohlc_list: list[dict[str, np.ndarray]], dt: float) -> 
     )
 
 
+def _fit_heston_npe(prices: np.ndarray, dt: float) -> dict:
+    """
+    Per-asset Heston NPE fit: not implemented (batch-only amortized model).
+
+    This function should never be called — heston_npe is batch-only.
+    The runner uses fit_batch when available; this fallback raises a clear error.
+    """
+    raise NotImplementedError(
+        "heston_npe is batch-only; train the model first: scripts/train_npe_heston.py"
+    )
+
+
+def _batch_heston_npe(price_arrays: list[np.ndarray], dt: float) -> dict:
+    """
+    Batch adapter for Heston NPE: prices -> log-returns -> fit_batch.
+
+    Catches FileNotFoundError from missing checkpoint and re-raises with
+    the same clear message (train-first instruction).
+    """
+    from ..physical.batched.npe import estimator
+    from ..physical.batched import common
+
+    try:
+        returns_list = [np.diff(np.log(prices)) for prices in price_arrays]
+        returns, mask = common.pad_returns(returns_list)
+        return estimator.fit_batch(returns, mask, dt)
+    except FileNotFoundError as e:
+        # Re-raise with same message to surface in runner error handling
+        raise
+
+
 register_model(ModelSpec(name="gbm", fit=_fit_gbm, min_obs=60, fit_batch=_batch_gbm))
 register_model(ModelSpec(name="garch", fit=_fit_garch, min_obs=250, fit_batch=_batch_garch))
 register_model(ModelSpec(name="heston_qmle", fit=_fit_heston_qmle, min_obs=60, fit_batch=_batch_heston_qmle))
@@ -250,4 +281,11 @@ register_model(ModelSpec(
     min_obs=60,
     fit_batch=_batch_heston_qmle_gk,
     needs_ohlc=True,
+))
+register_model(ModelSpec(
+    name="heston_npe",
+    fit=_fit_heston_npe,
+    min_obs=250,
+    fit_batch=_batch_heston_npe,
+    needs_ohlc=False,
 ))
