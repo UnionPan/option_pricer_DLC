@@ -254,3 +254,42 @@ def test_result_structure():
     assert result.a > 0
     assert result.b > 0
     assert result.a + result.b < 1.0
+
+
+def test_high_dimensional_factors():
+    """
+    Test 5: DCC handles high-dimensional factor returns (k=18, T=1250).
+
+    Regression test for real S&P 500 data dimensions where some GARCH fits
+    may fail. Ensures fit_dcc handles NaN GARCH parameters gracefully.
+    """
+    k = 18
+    T = 1250
+    a_true = 0.05
+    b_true = 0.90
+
+    # Simulate high-dimensional DCC-GARCH data matching real data regime
+    factor_returns = simulate_dcc_garch(k, T, a_true, b_true, seed=202406)
+
+    # Fit DCC model - should not crash even if some GARCH fits fail
+    result = fit_dcc(factor_returns)
+
+    # Check that result is valid (may have fewer factors if some GARCH fits failed)
+    assert isinstance(result, DCCResult)
+    assert result.converged, "High-dimensional DCC should converge"
+    assert result.a > 0, "a should be positive"
+    assert result.b > 0, "b should be positive"
+    assert result.a + result.b < 1.0, "a + b should be < 1"
+
+    # qbar dimension should match number of valid factors (at most k)
+    k_valid = result.qbar.shape[0]
+    assert k_valid <= k, f"Valid factors {k_valid} should be <= original {k}"
+    assert k_valid > 0, "Should have at least one valid factor"
+    assert result.last_corr.shape == (k_valid, k_valid)
+
+    # Check GARCH parameters are all finite and valid
+    assert not result.garch_params.isna().any().any(), \
+        "Final GARCH params should not contain NaN"
+    assert np.all(result.garch_params['omega'] > 0), "omega should be positive"
+    assert np.all(result.garch_params['alpha'] > 0), "alpha should be positive"
+    assert np.all(result.garch_params['beta'] > 0), "beta should be positive"

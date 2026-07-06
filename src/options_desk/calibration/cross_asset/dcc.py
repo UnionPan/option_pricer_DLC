@@ -257,8 +257,22 @@ def fit_dcc(factor_returns: np.ndarray) -> DCCResult:
         'mu': garch_results['mu'],
     })
 
+    # Filter out factors with NaN GARCH parameters (failed fits)
+    valid_mask = ~garch_params.isna().any(axis=1)
+    if not valid_mask.all():
+        n_failed = (~valid_mask).sum()
+        print(f"Warning: {n_failed}/{k} factors failed GARCH fit (NaN params). Proceeding with {valid_mask.sum()} valid factors.")
+
+        # Keep only valid factors
+        garch_params = garch_params[valid_mask].reset_index(drop=True)
+        factor_returns = factor_returns[:, valid_mask.to_numpy()]
+        garch_ll_vec = garch_results['log_likelihood'][valid_mask.to_numpy()]
+        k = factor_returns.shape[1]  # Update k to reflect valid factors only
+    else:
+        garch_ll_vec = garch_results['log_likelihood']
+
     # GARCH log-likelihood
-    garch_ll = np.sum(garch_results['log_likelihood'])
+    garch_ll = np.sum(garch_ll_vec[np.isfinite(garch_ll_vec)])
 
     # Step 2: Compute standardized residuals
     eps = _compute_standardized_residuals(factor_returns, garch_params)
