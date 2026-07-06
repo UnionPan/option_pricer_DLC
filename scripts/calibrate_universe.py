@@ -61,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="run output root")
     p.add_argument("--run-id", default=None,
                    help="run id; reuse an existing id to resume")
+    p.add_argument("--cross-asset", nargs="*", default=[],
+                   choices=["factor", "dcc", "pooling"],
+                   help="cross-asset stages to run (factor, dcc, pooling)")
+    p.add_argument("--pooling-model", default="heston_qmle",
+                   help="model to pool (default: heston_qmle)")
     p.add_argument("--list-models", action="store_true",
                    help="print registered models and exit")
     p.add_argument("--list-universes", action="store_true",
@@ -95,7 +100,8 @@ def main(argv: list[str] | None = None) -> int:
     store = PriceStore(args.price_lake, fetcher=_default_fetcher())
     cfg = RunConfig(universe=universe.name, models=args.models,
                     years=args.years, n_jobs=args.jobs,
-                    out_root=args.out_root, run_id=args.run_id, end=args.end)
+                    out_root=args.out_root, run_id=args.run_id, end=args.end,
+                    cross_asset=args.cross_asset, pooling_model=args.pooling_model)
 
     run_dir = run_calibration(cfg, store, universe=universe)
 

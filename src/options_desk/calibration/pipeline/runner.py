@@ -5,6 +5,7 @@ calibration -> parquet results, with checkpoint/resume at model granularity.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -15,6 +16,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
+from ..cross_asset import fit_dcc, fit_factor_model, pool_parameters
 from ..data.price_store import PriceStore
 from ..data.universe import Universe, load_universe
 from .registry import get_model
@@ -40,6 +42,9 @@ class RunConfig:
     out_root: str | Path = "runs/calibration"
     run_id: str | None = None          # pass an existing id to resume
     end: str | None = None             # default: today (UTC)
+    cross_asset: list[str] = field(default_factory=list)
+                                       # allowed: "factor", "dcc", "pooling"
+    pooling_model: str = "heston_qmle" # model to pool (must be in models list)
 
 
 def _calibrate_one(model_name: str, ticker: str,
@@ -135,6 +140,208 @@ def _calibrate_batch(
         return None
 
 
+def _is_stage_done(run_dir: Path, stage: str) -> bool:
+    """Check if a cross-asset stage has been completed."""
+    return (run_dir / f"{stage}.done").exists()
+
+
+def _mark_stage_done(run_dir: Path, stage: str) -> None:
+    """Mark a cross-asset stage as completed."""
+    (run_dir / f"{stage}.done").write_text(datetime.now(timezone.utc).isoformat())
+
+
+def _run_cross_asset_stage(
+    cfg: RunConfig,
+    store: PriceStore,
+    universe: Universe,
+    start,
+    end,
+    run_dir: Path,
+) -> None:
+    """Run cross-asset analysis stages (factor/dcc/pooling) with isolation."""
+    if not cfg.cross_asset:
+        return
+
+    logger.info("Running cross-asset stages: %s", cfg.cross_asset)
+
+    # Initialize cross-asset manifest section
+    ca_manifest = read_manifest(run_dir).get("cross_asset", {})
+    if "errors" not in ca_manifest:
+        ca_manifest["errors"] = {}
+    if "completed" not in ca_manifest:
+        ca_manifest["completed"] = []
+
+    # Stage 1: Build returns matrix (needed for factor and for tracking excluded)
+    rm = None
+    T_window = round(cfg.years * 252)
+    if "factor" in cfg.cross_asset or "dcc" in cfg.cross_asset:
+        min_obs = min(504, int(0.8 * T_window))
+        rm = store.returns_matrix(universe.tickers, start, end, min_obs=min_obs)
+        ca_manifest["excluded"] = len(rm.excluded)
+        write_manifest(run_dir, {"cross_asset": ca_manifest})
+        logger.info("Returns matrix: %d names × %d days; excluded %d",
+                    len(rm.tickers), len(rm.returns), len(rm.excluded))
+
+    # Stage 2: Factor model
+    if "factor" in cfg.cross_asset:
+        if _is_stage_done(run_dir, "factor"):
+            logger.info("Stage 'factor' already done — skipping (resume)")
+        else:
+            try:
+                if rm is None or len(rm.tickers) == 0:
+                    raise ValueError("No valid tickers for factor model")
+
+                logger.info("Fitting factor model on %d names...", len(rm.tickers))
+                fm = fit_factor_model(
+                    rm.returns.astype(np.float64),
+                    rm.tickers,
+                )
+
+                # Save factor_model.npz
+                np.savez(
+                    run_dir / "factor_model.npz",
+                    loadings=fm.loadings,
+                    factor_cov=fm.factor_cov,
+                    resid_var=fm.resid_var,
+                    factors=fm.factors,
+                    tickers=np.array(fm.tickers),
+                )
+
+                # Save factor_summary.json
+                T, N = rm.returns.shape
+                # Compute eigenvalue shares
+                corr = (rm.returns.T @ rm.returns) / (T - 1)
+                eigvals = np.linalg.eigvalsh(corr)
+                eigvals = np.sort(eigvals)[::-1]
+                total_var = eigvals.sum()
+                top5_shares = [float(eigvals[i] / total_var)
+                               for i in range(min(5, len(eigvals)))]
+
+                factor_summary = {
+                    "k": int(fm.k),
+                    "mp_edge": float(fm.mp_edge),
+                    "n_names": N,
+                    "T": T,
+                    "min_eig_lower_bound": float(fm.cov().min_eig_lower_bound()),
+                    "top5_eigenvalue_shares": top5_shares,
+                }
+                (run_dir / "factor_summary.json").write_text(
+                    json.dumps(factor_summary, indent=2)
+                )
+
+                _mark_stage_done(run_dir, "factor")
+                ca_manifest["completed"].append("factor")
+                write_manifest(run_dir, {"cross_asset": ca_manifest})
+                logger.info("Factor model: k=%d, mp_edge=%.4f", fm.k, fm.mp_edge)
+
+            except Exception as e:  # noqa: BLE001
+                err_msg = f"{type(e).__name__}: {e}"
+                logger.error("Stage 'factor' failed: %s", err_msg)
+                ca_manifest["errors"]["factor"] = err_msg
+                write_manifest(run_dir, {"cross_asset": ca_manifest})
+
+    # Stage 3: DCC
+    if "dcc" in cfg.cross_asset:
+        if _is_stage_done(run_dir, "dcc"):
+            logger.info("Stage 'dcc' already done — skipping (resume)")
+        else:
+            try:
+                # Load factors from this run
+                factor_npz_path = run_dir / "factor_model.npz"
+                if not factor_npz_path.exists():
+                    raise FileNotFoundError(
+                        "factor_model.npz not found; run 'factor' stage first"
+                    )
+
+                factor_data = np.load(factor_npz_path)
+                factors = factor_data["factors"]
+
+                logger.info("Fitting DCC on %d factors...", factors.shape[1])
+                dcc_result = fit_dcc(factors)
+
+                # Save dcc.json
+                dcc_dict = {
+                    "a": float(dcc_result.a),
+                    "b": float(dcc_result.b),
+                    "log_likelihood": float(dcc_result.log_likelihood),
+                    "converged": bool(dcc_result.converged),
+                    "garch_params": dcc_result.garch_params.to_dict(orient="records"),
+                    "last_corr": dcc_result.last_corr.tolist(),
+                }
+                (run_dir / "dcc.json").write_text(
+                    json.dumps(dcc_dict, indent=2)
+                )
+
+                _mark_stage_done(run_dir, "dcc")
+                ca_manifest["completed"].append("dcc")
+                write_manifest(run_dir, {"cross_asset": ca_manifest})
+                logger.info("DCC: a=%.4f, b=%.4f, converged=%s",
+                            dcc_result.a, dcc_result.b, dcc_result.converged)
+
+            except Exception as e:  # noqa: BLE001
+                err_msg = f"{type(e).__name__}: {e}"
+                logger.error("Stage 'dcc' failed: %s", err_msg)
+                ca_manifest["errors"]["dcc"] = err_msg
+                write_manifest(run_dir, {"cross_asset": ca_manifest})
+
+    # Stage 4: Pooling
+    if "pooling" in cfg.cross_asset:
+        if _is_stage_done(run_dir, "pooling"):
+            logger.info("Stage 'pooling' already done — skipping (resume)")
+        else:
+            try:
+                model = cfg.pooling_model
+                model_parquet = run_dir / f"{model}.parquet"
+
+                if not model_parquet.exists():
+                    raise FileNotFoundError(
+                        f"{model}.parquet not found; run model calibration first"
+                    )
+
+                df = pd.read_parquet(model_parquet)
+
+                # Determine parameters to pool based on model
+                if model == "heston_qmle":
+                    params = ["kappa", "theta", "sigma_v", "rho", "mu", "v0"]
+                elif model == "garch":
+                    params = ["omega", "alpha", "beta", "mu"]
+                elif model == "gbm":
+                    params = ["mu", "sigma"]
+                else:
+                    # Generic: find numeric columns excluding standard columns
+                    exclude_cols = {"ticker", "sector", "calibration_date",
+                                    "converged", "error"}
+                    params = [c for c in df.columns
+                              if c not in exclude_cols and df[c].dtype in
+                              [np.float64, np.float32, np.int64, np.int32]]
+
+                # Filter to only existing columns
+                params = [p for p in params if p in df.columns]
+
+                if not params:
+                    raise ValueError(f"No parameters to pool for model {model}")
+
+                logger.info("Pooling %d parameters for model %s...",
+                            len(params), model)
+                df_pooled = pool_parameters(df, params)
+
+                # Save pooled results
+                pooled_path = run_dir / f"{model}_pooled.parquet"
+                df_pooled.to_parquet(pooled_path, index=False)
+
+                _mark_stage_done(run_dir, "pooling")
+                ca_manifest["completed"].append("pooling")
+                write_manifest(run_dir, {"cross_asset": ca_manifest})
+                logger.info("Pooling complete: %d parameters, output=%s",
+                            len(params), pooled_path.name)
+
+            except Exception as e:  # noqa: BLE001
+                err_msg = f"{type(e).__name__}: {e}"
+                logger.error("Stage 'pooling' failed: %s", err_msg)
+                ca_manifest["errors"]["pooling"] = err_msg
+                write_manifest(run_dir, {"cross_asset": ca_manifest})
+
+
 def run_calibration(
     cfg: RunConfig,
     store: PriceStore,
@@ -220,6 +427,9 @@ def run_calibration(
         model_stats[model] = {"n": int(len(df)), "n_converged": n_conv}
         write_manifest(run_dir, {"models": model_stats})
         logger.info("model %s: %d/%d converged", model, n_conv, len(df))
+
+    # Cross-asset stages (factor, dcc, pooling)
+    _run_cross_asset_stage(cfg, store, universe, start, end, run_dir)
 
     write_manifest(run_dir, {"models": model_stats, "status": "complete",
                              "finished_at": datetime.now(timezone.utc).isoformat()})
