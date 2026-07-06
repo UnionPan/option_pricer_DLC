@@ -91,6 +91,41 @@ class TestHestonSimulator:
         returns3 = simulate_heston_paths(key2, thetas, T=T, dt=1/252)
         assert not jnp.allclose(returns1, returns3)
 
+    def test_full_truncation_drift(self):
+        """Regression: variance drift must use v_plus (full truncation), not raw v_t.
+
+        With v_t = -0.01 and z_v = 0, full truncation gives
+            v_{t+1} = v_t + kappa * (theta - 0) * dt
+        NOT the partial-truncation value
+            v_{t+1} = v_t + kappa * (theta - v_t) * dt.
+        """
+        from src.options_desk.calibration.physical.batched.npe.simulate import (
+            _variance_step,
+        )
+
+        kappa = 3.0
+        theta = 0.04
+        sigma_v = 0.4
+        dt = 1 / 252
+        v_t = jnp.float32(-0.01)
+        z_v = jnp.float32(0.0)
+
+        v_tp1 = _variance_step(v_t, kappa, theta, sigma_v, dt, z_v)
+
+        # Full truncation: v_plus = 0 -> drift = kappa * theta * dt
+        expected_full = -0.01 + kappa * theta * dt
+        # Partial truncation (the bug): drift = kappa * (theta + 0.01) * dt
+        wrong_partial = -0.01 + kappa * (theta + 0.01) * dt
+
+        np.testing.assert_allclose(float(v_tp1), expected_full, rtol=1e-5)
+        assert abs(float(v_tp1) - wrong_partial) > 1e-6, \
+            "Variance drift matches partial truncation, not full truncation"
+
+        # Also check the diffusion term vanished (sqrt(v_plus) = 0):
+        # with a nonzero shock the result must be identical when v_t < 0.
+        v_tp1_shocked = _variance_step(v_t, kappa, theta, sigma_v, dt, jnp.float32(5.0))
+        np.testing.assert_allclose(float(v_tp1_shocked), expected_full, rtol=1e-5)
+
     def test_simulator_moment_check(self):
         """Mean annualized realized variance should match theta within 15%."""
         # Fixed parameters: θ=(3,0.04,0.4,−0.6,0.05,0.04)

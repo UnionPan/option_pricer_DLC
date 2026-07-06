@@ -116,6 +116,26 @@ def sample_prior(key, n):
 # ────────────────────────────────────────────────────────────────────────────
 # Heston simulator
 # ────────────────────────────────────────────────────────────────────────────
+def _variance_step(v_t, kappa, theta, sigma_v, dt, z_v):
+    """
+    Full-truncation Euler variance update.
+
+    v_plus = max(v_t, 0) is used in BOTH the drift and the diffusion:
+        v_{t+1} = v_t + kappa (theta - v_plus) dt + sigma_v sqrt(v_plus dt) z_v
+
+    Args:
+        v_t: current variance (may be negative)
+        kappa, theta, sigma_v: Heston variance parameters
+        dt: time increment
+        z_v: standard normal variance shock
+
+    Returns:
+        v_{t+1} (un-truncated; truncation is applied at the next use)
+    """
+    v_plus = jnp.maximum(v_t, 0.0)
+    return v_t + kappa * (theta - v_plus) * dt + sigma_v * jnp.sqrt(v_plus * dt) * z_v
+
+
 def simulate_heston_paths(key, thetas, T, dt=1/252):
     """
     Simulate Heston model log-returns via Euler discretization with full truncation.
@@ -126,9 +146,9 @@ def simulate_heston_paths(key, thetas, T, dt=1/252):
         dW_t^S dW_t^v = rho dt
 
     Euler scheme (full truncation):
-        v_plus = max(v, 0)  # truncate before use
+        v_plus = max(v, 0)  # truncate before use (in BOTH sqrt and drift)
         r_t = (mu - 0.5 * v_plus) dt + sqrt(v_plus * dt) * (rho z_v + sqrt(1 - rho²) z_perp)
-        v_{t+1} = v_t + kappa (theta - v_t) dt + sigma_v sqrt(v_plus dt) z_v
+        v_{t+1} = v_t + kappa (theta - v_plus) dt + sigma_v sqrt(v_plus dt) z_v
 
     Args:
         key: JAX PRNGKey
@@ -168,8 +188,8 @@ def simulate_heston_paths(key, thetas, T, dt=1/252):
         spot_shock = rho * z_v_t + sqrt_1m_rho2 * z_perp_t
         r_t = (mu - 0.5 * v_plus) * dt + jnp.sqrt(v_plus * dt) * spot_shock
 
-        # Variance update
-        v_tp1 = v_t + kappa * (theta - v_t) * dt + sigma_v * jnp.sqrt(v_plus * dt) * z_v_t
+        # Variance update (full truncation: v_plus in both drift and diffusion)
+        v_tp1 = _variance_step(v_t, kappa, theta, sigma_v, dt, z_v_t)
 
         return v_tp1, r_t
 
