@@ -29,6 +29,7 @@ class ModelSpec:
     fit: FitFn
     min_obs: int = 60
     fit_batch: BatchFitFn | None = None
+    needs_ohlc: bool = False
 
 
 _REGISTRY: dict[str, ModelSpec] = {}
@@ -99,6 +100,18 @@ def _fit_merton(prices: np.ndarray, dt: float) -> dict:
 def _fit_rbergomi(prices: np.ndarray, dt: float) -> dict:
     from ..physical.rough_bergomi_calibrator import RoughBergomiCalibrator
     return _scalars(RoughBergomiCalibrator(window=20, max_lag=10).fit(prices, dt=dt))
+
+
+def _fit_heston_qmle_gk(prices: np.ndarray, dt: float) -> dict:
+    """
+    Per-asset Heston QMLE GK fit: not implemented (OHLC models have no scipy fallback).
+
+    This function should never be called — the runner only uses fit_batch for
+    needs_ohlc models and raises an error on adapter exception.
+    """
+    raise NotImplementedError(
+        "heston_qmle_gk requires OHLC data and has no per-asset scipy fallback"
+    )
 
 
 # Batch adapters: take list of price arrays, compute returns/levels internally,
@@ -191,9 +204,50 @@ def _batch_rbergomi(price_arrays: list[np.ndarray], dt: float) -> dict:
     return rbergomi.fit_batch(returns, mask, dt)
 
 
+def _batch_heston_qmle_gk(ohlc_list: list[dict[str, np.ndarray]], dt: float) -> dict:
+    """
+    Batch adapter for Heston QMLE with Garman-Klass OHLC variance proxy.
+
+    Args:
+        ohlc_list: List of dicts with keys 'open', 'high', 'low', 'close'
+                   (already adjustment-scaled by the runner)
+        dt: Time increment in years
+
+    Returns:
+        Dictionary with Heston parameters (same keys as fit_batch)
+    """
+    from ..physical.batched import heston_qmle, common
+
+    # Pad each of the four OHLC series
+    open_list = [ohlc["open"] for ohlc in ohlc_list]
+    high_list = [ohlc["high"] for ohlc in ohlc_list]
+    low_list = [ohlc["low"] for ohlc in ohlc_list]
+    close_list = [ohlc["close"] for ohlc in ohlc_list]
+
+    open_padded, mask_open = common.pad_returns(open_list)
+    high_padded, mask_high = common.pad_returns(high_list)
+    low_padded, mask_low = common.pad_returns(low_list)
+    close_padded, mask_close = common.pad_returns(close_list)
+
+    # All masks should be identical (same valid periods across OHLC)
+    # Use the close mask as the primary mask
+    mask = mask_close
+
+    return heston_qmle.fit_batch_ohlc(
+        open_padded, high_padded, low_padded, close_padded, mask, dt, smooth_window=10
+    )
+
+
 register_model(ModelSpec(name="gbm", fit=_fit_gbm, min_obs=60, fit_batch=_batch_gbm))
 register_model(ModelSpec(name="garch", fit=_fit_garch, min_obs=250, fit_batch=_batch_garch))
 register_model(ModelSpec(name="heston_qmle", fit=_fit_heston_qmle, min_obs=60, fit_batch=_batch_heston_qmle))
 register_model(ModelSpec(name="ou", fit=_fit_ou, min_obs=60, fit_batch=_batch_ou))
 register_model(ModelSpec(name="merton", fit=_fit_merton, min_obs=250, fit_batch=_batch_merton))
 register_model(ModelSpec(name="rbergomi", fit=_fit_rbergomi, min_obs=250, fit_batch=_batch_rbergomi))
+register_model(ModelSpec(
+    name="heston_qmle_gk",
+    fit=_fit_heston_qmle_gk,
+    min_obs=60,
+    fit_batch=_batch_heston_qmle_gk,
+    needs_ohlc=True,
+))

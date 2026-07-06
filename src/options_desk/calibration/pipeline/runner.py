@@ -64,6 +64,68 @@ def _calibrate_one(model_name: str, ticker: str,
                 "error": f"{type(e).__name__}: {e}"}
 
 
+def _build_ohlc_data(
+    store: PriceStore,
+    tickers: list[str],
+    start,
+    end,
+) -> dict[str, dict[str, np.ndarray] | None]:
+    """
+    Build OHLC data for all tickers with adjustment scaling.
+
+    For each ticker, construct a dict with keys 'open', 'high', 'low', 'close'
+    where each OHLC price is scaled by the adjustment factor (adj_close / close)
+    to preserve GK variance ratios while making close-to-close returns adjustment-aware.
+
+    Args:
+        store: Price store
+        tickers: List of tickers
+        start: Start date
+        end: End date
+
+    Returns:
+        Map of ticker -> OHLC dict (or None if no data)
+    """
+    ohlc_by_ticker = {}
+    for t in tickers:
+        df = store.get_prices(t)
+        if df is None:
+            ohlc_by_ticker[t] = None
+            continue
+
+        # Filter to window
+        df = df.loc[(df.index >= start) & (df.index <= end)]
+
+        if len(df) == 0:
+            ohlc_by_ticker[t] = None
+            continue
+
+        # Check required columns exist
+        required = ["open", "high", "low", "close", "adj_close"]
+        if not all(col in df.columns for col in required):
+            ohlc_by_ticker[t] = None
+            continue
+
+        # Compute adjustment factor: adj_close / close (guard zeros/NaN)
+        close_vals = df["close"].values
+        adj_close_vals = df["adj_close"].values
+
+        # Avoid division by zero or NaN
+        factor = np.ones_like(close_vals, dtype=np.float64)
+        valid_mask = (close_vals > 0) & np.isfinite(close_vals) & np.isfinite(adj_close_vals)
+        factor[valid_mask] = adj_close_vals[valid_mask] / close_vals[valid_mask]
+
+        # Scale OHLC by adjustment factor
+        ohlc_dict = {}
+        for col in ["open", "high", "low", "close"]:
+            scaled = df[col].values * factor
+            ohlc_dict[col] = scaled.astype(np.float64)
+
+        ohlc_by_ticker[t] = ohlc_dict
+
+    return ohlc_by_ticker
+
+
 def _calibrate_batch(
     model_name: str,
     tickers: list[str],
@@ -137,6 +199,108 @@ def _calibrate_batch(
             model_name, type(e).__name__, e
         )
         # Return None to signal fallback to joblib
+        return None
+
+
+def _calibrate_batch_ohlc(
+    model_name: str,
+    tickers: list[str],
+    ohlc_by_ticker: dict[str, dict[str, np.ndarray] | None],
+    dt: float,
+) -> list[dict] | None:
+    """
+    Batch calibration for OHLC models.
+
+    Args:
+        model_name: Model to calibrate
+        tickers: Ordered list of tickers (universe order)
+        ohlc_by_ticker: Map of ticker -> OHLC dict (or None)
+        dt: Time increment
+
+    Returns:
+        List of dicts (one per ticker), or None if batch calibration fails
+    """
+    spec = get_model(model_name)
+
+    # Split into valid (enough data and valid OHLC) and invalid
+    valid_tickers = []
+    valid_ohlc = []
+    invalid_rows = []
+
+    for ticker in tickers:
+        ohlc = ohlc_by_ticker[ticker]
+
+        # Check if we have OHLC data
+        if ohlc is None:
+            invalid_rows.append({
+                "ticker": ticker,
+                "converged": False,
+                "error": "insufficient data (0 < {} obs)".format(spec.min_obs),
+            })
+            continue
+
+        # Check length
+        n = len(ohlc["close"])
+        if n < spec.min_obs:
+            invalid_rows.append({
+                "ticker": ticker,
+                "converged": False,
+                "error": f"insufficient data ({n} < {spec.min_obs} obs)",
+            })
+            continue
+
+        # Check for NaN/inf in OHLC data
+        has_invalid = False
+        for col in ["open", "high", "low", "close"]:
+            if not np.all(np.isfinite(ohlc[col])):
+                has_invalid = True
+                break
+
+        if has_invalid:
+            invalid_rows.append({
+                "ticker": ticker,
+                "converged": False,
+                "error": "invalid OHLC data (NaN or inf values)",
+            })
+            continue
+
+        valid_tickers.append(ticker)
+        valid_ohlc.append(ohlc)
+
+    # If no valid tickers, return only invalid rows
+    if not valid_tickers:
+        return invalid_rows
+
+    # Try batch calibration
+    try:
+        result_dict = spec.fit_batch(valid_ohlc, dt)
+        # result_dict has keys -> (N,)-arrays where N = len(valid_tickers)
+
+        # Assemble rows
+        valid_rows = []
+        for i, ticker in enumerate(valid_tickers):
+            row = {"ticker": ticker, "error": ""}
+            for key, arr in result_dict.items():
+                # Extract scalar value for this ticker
+                val = arr[i]
+                # Convert numpy types to native Python types for dict
+                if isinstance(val, (np.integer, np.floating, np.bool_)):
+                    val = val.item()
+                row[key] = val
+            valid_rows.append(row)
+
+        # Combine valid and invalid rows in original ticker order
+        ticker_to_row = {r["ticker"]: r for r in valid_rows + invalid_rows}
+        return [ticker_to_row[t] for t in tickers]
+
+    except Exception as e:  # noqa: BLE001
+        # Batch calibration failed -> NO fallback for OHLC models
+        logger.error(
+            "Batch calibration for OHLC model %s raised %s: %s; "
+            "no fallback available",
+            model_name, type(e).__name__, e
+        )
+        # Return None to signal error
         return None
 
 
@@ -395,6 +559,8 @@ def run_calibration(
 
     cal_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     model_stats = read_manifest(run_dir).get("models", {})
+    models_errors = read_manifest(run_dir).get("models_errors", {})
+
     for model in cfg.models:
         if is_model_done(run_dir, model):
             logger.info("model %s already done — skipping (resume)", model)
@@ -411,10 +577,25 @@ def run_calibration(
 
         if use_batch:
             logger.info("Using batch calibration path for model %s", model)
-            rows = _calibrate_batch(model, universe.tickers, prices_by_ticker, cfg.dt)
-            # If batch calibration failed (returns None), fall back to joblib
-            if rows is None:
-                use_batch = False
+
+            if spec.needs_ohlc:
+                # Build OHLC data for needs_ohlc models
+                ohlc_by_ticker = _build_ohlc_data(store, universe.tickers, start, end)
+                rows = _calibrate_batch_ohlc(
+                    model, universe.tickers, ohlc_by_ticker, cfg.dt
+                )
+                # OHLC models have no fallback: if rows is None, record error and skip
+                if rows is None:
+                    err_msg = "Batch calibration failed (see logs)"
+                    logger.error("Model %s (OHLC) batch calibration failed; no fallback available", model)
+                    models_errors[model] = err_msg
+                    write_manifest(run_dir, {"models_errors": models_errors})
+                    continue
+            else:
+                rows = _calibrate_batch(model, universe.tickers, prices_by_ticker, cfg.dt)
+                # If batch calibration failed (returns None), fall back to joblib
+                if rows is None:
+                    use_batch = False
 
         if not use_batch:
             logger.info("Using per-asset joblib path for model %s", model)
