@@ -176,6 +176,16 @@ def test_full_cross_asset_stage(synthetic_store, tmp_path):
     assert "garch_params" in dcc_result
     assert "last_corr" in dcc_result
     assert isinstance(dcc_result["last_corr"], list)
+    # F4: Check qbar is persisted
+    assert "qbar" in dcc_result
+    assert isinstance(dcc_result["qbar"], list)
+    # F1: Check valid_factor_indices and factor counts
+    assert "valid_factor_indices" in dcc_result
+    assert isinstance(dcc_result["valid_factor_indices"], list)
+    assert "n_factors_original" in dcc_result
+    assert "n_factors_used" in dcc_result
+    assert dcc_result["n_factors_used"] == len(dcc_result["valid_factor_indices"])
+    assert dcc_result["n_factors_used"] <= dcc_result["n_factors_original"]
 
     # Verify pooled parameters
     df_pooled = pd.read_parquet(run_dir / "heston_qmle_pooled.parquet")

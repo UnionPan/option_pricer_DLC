@@ -267,6 +267,10 @@ def _run_cross_asset_stage(
                     "converged": bool(dcc_result.converged),
                     "garch_params": dcc_result.garch_params.to_dict(orient="records"),
                     "last_corr": dcc_result.last_corr.tolist(),
+                    "qbar": dcc_result.qbar.tolist(),
+                    "valid_factor_indices": dcc_result.valid_factor_indices.tolist(),
+                    "n_factors_original": factors.shape[1],
+                    "n_factors_used": len(dcc_result.garch_params),
                 }
                 (run_dir / "dcc.json").write_text(
                     json.dumps(dcc_dict, indent=2)

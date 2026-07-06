@@ -261,7 +261,8 @@ def test_high_dimensional_factors():
     Test 5: DCC handles high-dimensional factor returns (k=18, T=1250).
 
     Regression test for real S&P 500 data dimensions where some GARCH fits
-    may fail. Ensures fit_dcc handles NaN GARCH parameters gracefully.
+    may fail. Ensures fit_dcc handles NaN GARCH parameters gracefully and
+    correctly tracks valid_factor_indices.
     """
     k = 18
     T = 1250
@@ -293,3 +294,23 @@ def test_high_dimensional_factors():
     assert np.all(result.garch_params['omega'] > 0), "omega should be positive"
     assert np.all(result.garch_params['alpha'] > 0), "alpha should be positive"
     assert np.all(result.garch_params['beta'] > 0), "beta should be positive"
+
+    # F1: Check valid_factor_indices
+    assert isinstance(result.valid_factor_indices, np.ndarray), \
+        "valid_factor_indices should be ndarray"
+    assert len(result.valid_factor_indices) == k_valid, \
+        f"valid_factor_indices length {len(result.valid_factor_indices)} should match k_valid {k_valid}"
+    assert result.valid_factor_indices.dtype == np.intp, \
+        "valid_factor_indices should be integer indices"
+    assert np.all(result.valid_factor_indices < k), \
+        "All indices should be < k_original"
+    assert np.all(result.valid_factor_indices >= 0), \
+        "All indices should be >= 0"
+    # Ensure indices are unique and sorted
+    assert len(np.unique(result.valid_factor_indices)) == k_valid, \
+        "valid_factor_indices should be unique"
+
+    # F3: Check dcc_corr_path accepts original-width factor array
+    R_path = dcc_corr_path(result, factor_returns)
+    assert R_path.shape == (T, k_valid, k_valid), \
+        f"R_path shape should be (T, k_valid, k_valid), got {R_path.shape}"

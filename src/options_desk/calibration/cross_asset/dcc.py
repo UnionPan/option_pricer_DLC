@@ -32,6 +32,7 @@ class DCCResult:
     last_corr: np.ndarray  # (k, k) final correlation matrix R_T
     log_likelihood: float  # Total log-likelihood (GARCH + DCC)
     converged: bool  # Convergence flag
+    valid_factor_indices: np.ndarray  # indices into original factor columns (before NaN filtering)
 
 
 def _reconstruct_garch_volatility(returns: np.ndarray, omega: float, alpha: float,
@@ -237,14 +238,14 @@ def fit_dcc(factor_returns: np.ndarray) -> DCCResult:
     Returns:
         DCCResult with fitted parameters
     """
-    T, k = factor_returns.shape
+    T, k_original = factor_returns.shape
 
     # Step 1: Fit GARCH(1,1) to each factor
     # Transpose to (k, T) for batched GARCH
     returns_transposed = factor_returns.T  # (k, T)
 
     # All factors have same length (no padding needed), but batched GARCH expects mask
-    mask = np.ones((k, T), dtype=np.float32)
+    mask = np.ones((k_original, T), dtype=np.float32)
 
     # dt=1.0: factor returns are already per-period, GARCH operates on return scale
     garch_results = garch.fit_batch(returns_transposed, mask, dt=1.0)
@@ -259,17 +260,20 @@ def fit_dcc(factor_returns: np.ndarray) -> DCCResult:
 
     # Filter out factors with NaN GARCH parameters (failed fits)
     valid_mask = ~garch_params.isna().any(axis=1)
+    valid_factor_indices = np.where(valid_mask.to_numpy())[0]
+
     if not valid_mask.all():
         n_failed = (~valid_mask).sum()
-        print(f"Warning: {n_failed}/{k} factors failed GARCH fit (NaN params). Proceeding with {valid_mask.sum()} valid factors.")
+        print(f"Warning: {n_failed}/{k_original} factors failed GARCH fit (NaN params). Proceeding with {valid_mask.sum()} valid factors.")
 
         # Keep only valid factors
         garch_params = garch_params[valid_mask].reset_index(drop=True)
-        factor_returns = factor_returns[:, valid_mask.to_numpy()]
-        garch_ll_vec = garch_results['log_likelihood'][valid_mask.to_numpy()]
+        factor_returns = factor_returns[:, valid_factor_indices]
+        garch_ll_vec = garch_results['log_likelihood'][valid_factor_indices]
         k = factor_returns.shape[1]  # Update k to reflect valid factors only
     else:
         garch_ll_vec = garch_results['log_likelihood']
+        k = k_original
 
     # GARCH log-likelihood
     garch_ll = np.sum(garch_ll_vec[np.isfinite(garch_ll_vec)])
@@ -325,6 +329,7 @@ def fit_dcc(factor_returns: np.ndarray) -> DCCResult:
         last_corr=last_corr,
         log_likelihood=float(total_ll),
         converged=converged,
+        valid_factor_indices=valid_factor_indices,
     )
 
 
@@ -372,11 +377,29 @@ def dcc_corr_path(result: DCCResult, factor_returns: np.ndarray) -> np.ndarray:
 
     Args:
         result: DCCResult from fit_dcc
-        factor_returns: (T, k) array of factor returns
+        factor_returns: (T, k_original) or (T, k_used) array of factor returns.
+            If k_original (width equals len(result.valid_factor_indices)),
+            automatically slices to valid factors. Otherwise must match k_used.
 
     Returns:
-        R_path: (T, k, k) array of correlation matrices
+        R_path: (T, k_used, k_used) array of correlation matrices
+
+    Raises:
+        ValueError: If factor_returns width does not match either k_original or k_used
     """
+    k_used = len(result.garch_params)
+    k_original = len(result.valid_factor_indices)
+    T, k_input = factor_returns.shape
+
+    # Handle automatic slicing when original-width array is provided
+    if k_input == k_original:
+        factor_returns = factor_returns[:, result.valid_factor_indices]
+    elif k_input != k_used:
+        raise ValueError(
+            f"factor_returns width {k_input} must match either k_original={k_original} "
+            f"or k_used={k_used}. Use result.valid_factor_indices to slice if needed."
+        )
+
     # Recompute standardized residuals
     eps = _compute_standardized_residuals(factor_returns, result.garch_params)
 
