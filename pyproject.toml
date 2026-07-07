@@ -71,6 +71,11 @@ hedging = [
     "zarr>=2.16.0",
 ]
 
+[project.scripts]
+calibrate-universe = "options_desk.calibration.cli.calibrate:main"
+build-universes = "options_desk.calibration.cli.build_universes:main"
+train-npe-heston = "options_desk.calibration.cli.train_npe:main"
+
 [project.urls]
 Homepage = "https://github.com/yourusername/options-desk"
 Repository = "https://github.com/yourusername/options-desk"

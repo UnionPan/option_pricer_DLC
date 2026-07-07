@@ -1,11 +1,6 @@
-import sys
-from pathlib import Path
-
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-
-from build_universes import normalize_constituents  # noqa: E402
+from options_desk.calibration.cli.build_universes import normalize_constituents
 
 
 def test_normalize_constituents():

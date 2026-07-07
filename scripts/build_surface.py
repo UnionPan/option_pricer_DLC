@@ -6,12 +6,9 @@ This script loads option chain data, calculates implied volatilities,
 and constructs a volatility surface.
 """
 
-import sys
 from pathlib import Path
 
 # Add src to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / "src"))
 
 from options_desk.utils.config import load_data_sources_config
 

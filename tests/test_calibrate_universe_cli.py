@@ -1,14 +1,9 @@
-import sys
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from options_desk.calibration.cli import calibrate as cli
 
-import calibrate_universe as cli  # noqa: E402
-
-from options_desk.calibration.pipeline.results_store import (  # noqa: E402
+from options_desk.calibration.pipeline.results_store import (
     load_model_results,
 )
 
