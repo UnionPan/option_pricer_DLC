@@ -175,3 +175,13 @@ cython_debug/
 
 data/price_lake/
 data/npe/
+
+# Calibration/hedging run outputs
+runs/
+
+# Stop-hook artifacts (link-tools, now disabled)
+.lychee-results.json
+.lint-relative-paths-results.txt
+
+# Personal scratch
+docs/RESUME_BULLETS.md
