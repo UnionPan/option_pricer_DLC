@@ -452,9 +452,7 @@ def quick_calibrate_from_yfinance(
     Returns:
         ASCalibrationResult (with default microstructure params)
     """
-    import sys
-    sys.path.insert(0, 'src')
-    from calibration.data.yfinance_fetcher import YFinanceFetcher
+    from options_desk.calibration.data.yfinance_fetcher import YFinanceFetcher
 
     # Fetch data
     fetcher = YFinanceFetcher()
